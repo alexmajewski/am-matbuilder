@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <!-- This file contains definitions of shelves, toolbars, and tools.
+ It should not be hand-edited when it is being used by the application.
+ Note, that two definitions of the same element are not allowed in
+ a single file. -->
+
+  <toolshelf name="am_matbuilder" label="AM Mat Builder">
+    <memberTool name="tool_4"/>
+    <memberTool name="tool_5"/>
+  </toolshelf>
+
+  <tool name="tool_5" label="Customtool" icon="PLASMA_App">
+    <script scriptType="python"><![CDATA[import hou
+import os
+from PySide2 import QtCore, QtUiTools, QtWidgets
+# from PySide2.QtWidgets import QWidget
+
+__version__ = "0.1.0"
+__author__ = "Alex Majewski"
+
+class MaterialCreator(QtWidgets.QWidget):
+    def __init__(self):
+        super(MaterialCreator,self).__init__()
+        ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
+        self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
+        self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        
+        self.ui.btn_addfiles.clicked.connect(self.add_files)
+        self.ui.btn_gensetup.clicked.connect(self.generate_setup)
+        
+        self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
+        self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
+       
+        # hou.ui.mainQtWindow().setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+    
+    
+        
+    def add_files(self):
+        files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
+        files = files.split(" ; ")
+        
+        for filepath in files:
+            self.add_item(filepath)
+        
+    def add_item(self, filepath):
+        widget = List_Item_Widget(filepath)
+        list_item = QtWidgets.QListWidgetItem()
+        list_item.setSizeHint(QtCore.QSize(90,75))
+        self.ui.list_textures.addItem(list_item)
+        self.ui.list_textures.setItemWidget(list_item, widget)
+    
+    def generate_setup(self):
+        if self.validate_item_types() == False:
+            print("Some textures don't have their type assigned. Aborting.")
+            return
+    
+        stage = hou.node("/stage/materiallibrary1")
+        
+        collect = stage.createNode("collect")
+        input_index = 0
+
+        mtlx_mat = stage.createNode("mtlxstandard_surface")
+        mtlx_mat.setGenericFlag(hou.nodeFlag.Material, False)
+        collect.setInput(input_index, mtlx_mat)
+        input_index += 1
+        
+        
+        mtlx_albedo = stage.createNode("mtlximage")
+        
+        mtlx_mat.setInput(1, mtlx_albedo)
+
+        
+        stage.layoutChildren()
+        
+    def validate_item_types(self):
+        for index in range(self.ui.list_textures.count()):
+            item = self.ui.list_textures.item(index)
+            widget = self.ui.list_textures.itemWidget(item)
+            
+            if widget.ui.texture_type.currentIndex() == -1:
+                return False
+        return True
+         
+
+        
+    
+
+class List_Item_Widget(QtWidgets.QWidget):
+    def __init__(self, filepath, parent=None):
+        super().__init__(parent)
+        ui_file = hou.expandString('$AMMATBUILD/list_item.ui')
+        self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
+        
+        resolved_path = hou.expandString(filepath)
+        file_name = os.path.basename(resolved_path)
+        
+        
+        self.ui.file_path.setText(file_name)
+        
+        type = self.detect_texture_type(file_name)
+        self.ui.texture_type.setCurrentIndex(type)
+        
+        self.ui.btn_destroy.clicked.connect(self.destroy)
+        
+    def detect_texture_type(self, file_name):
+        file_name = file_name.lower()
+        
+        base_color_names = ["color", "diffuse", "albedo"]
+        opacity_names = ["opacity", "alpha", "transparency"]
+        height_names = ["displace", "height"]
+        
+        
+        for name in base_color_names:
+            if name.lower() in file_name:
+                return 0
+                
+        for name in opacity_names:
+            if name.lower() in file_name:
+                return 6
+                
+        for name in height_names:
+            if name.lower() in file_name:
+                return 4
+        
+        if "metallic" in file_name:
+            return 1
+        elif "roughness" in file_name:
+            return 2
+        elif "normal" in file_name:
+            return 3
+        elif "bump" in file_name:
+            return 5
+        elif "emission" in file_name:
+            return 7
+            
+        return -1
+        
+    def destroy(self):
+        list = self.parent().parent()
+        items = list.findItems("", QtCore.Qt.MatchContains)
+           
+        for item in items:
+            if list.itemWidget(item) == self:
+                list.takeItem(list.row(item))
+                break
+
+        
+
+        
+    
+win = MaterialCreator()
+win.show()]]></script>
+  </tool>
+</shelfDocument>
