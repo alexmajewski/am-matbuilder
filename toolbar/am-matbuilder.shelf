@@ -14,10 +14,131 @@
     <script scriptType="python"><![CDATA[import hou
 import os
 from PySide2 import QtCore, QtUiTools, QtWidgets
-# from PySide2.QtWidgets import QWidget
 
 __version__ = "0.1.0"
 __author__ = "Alex Majewski"
+
+
+engines = ["MaterialX", "Redshift"]
+engine_lookup = {
+    "MaterialX" : {
+        "checkbox": "cb_use_mtlx",
+        "main_node": "mtlxstandard_surface",
+        "main_inputs": {
+            "base_color": 1,
+            "metallness": 3,
+            "roughness": 6,
+            "transmission": 10,
+            "emission_color": 36,
+            "opacity": 38,
+            "normal": 40,
+            "bump": 40
+        },
+        "material_intermediary_nodes": [],
+        "image_node": "mtlximage",
+        "image_parms": {
+            "type": "signature",
+            "mode": {
+                "base_color": "default",
+                "metallness": "default",
+                "roughness": "default",
+                "transmission": "default",
+                "emission_color": "default",
+                "opacity": "default",
+                "normal": "vector3",
+                "displacement": "default",
+                "bump": "default"
+                
+            },
+            "filepath": "file"
+        },
+        "image_intermediary_nodes": {
+            "normal": {
+                "node": "mtlxnormalmap",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "main_node"
+            },
+            "displacement": {
+                "node": "mtlxdisplacement",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "collect"
+            }
+            
+        }
+    },
+    "Redshift": {
+        "checkbox": "cb_use_redshift",
+        "main_node": "redshift::StandardMaterial",
+        "main_inputs": {
+            "base_color": 0,
+            "metallness": 3,
+            "roughness": 6,
+            "transmission": 10,
+            "emission_color": 32,
+            "opacity": 33,
+            "normal": 34,
+            "bump": 34
+        },
+        "material_intermediary_nodes": ['redshift::Sprite','redshift_usd_material'],
+
+        "image_node": "redshift::TextureSampler",
+        "image_parms": {
+            "type": "tex0_colorSpace",
+            "mode": {
+                "base_color": "sRGB",
+                "metallness": "Raw",
+                "roughness": "Raw",
+                "transmission": "Raw",
+                "emission_color": "Raw",
+                "opacity": "Raw",
+                "normal": "Raw",
+                "displacement": "Raw",
+                "bump": "Raw"
+            },
+            "filepath": "tex0"
+        },
+        "image_intermediary_nodes": {
+            "normal": {
+                "node": "redshift::BumpMap",
+                "input": 0,
+                "parms_to_change": {
+                    "inputType": "1"
+                },
+                "target": "main_node"
+            },
+            "bump": {
+                "node": "redshift::BumpMap",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "main_node"
+            },
+            
+            "displacement": {
+                "node": "redshift::Displacement",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "intermediary_output"
+            }
+        }
+
+    }
+}
+
+type_lookup = {
+    0: "base_color",
+    1: "metallness",
+    2: "roughness",
+    3: "normal",
+    4: "displacement",
+    5: "bump",
+    6: "opacity",
+    7: "emission"
+}
+# Dropdown menu indices:
+opacity_index = 6
+
 
 class MaterialCreator(QtWidgets.QWidget):
     def __init__(self):
@@ -25,54 +146,99 @@ class MaterialCreator(QtWidgets.QWidget):
         ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
         
         self.ui.btn_addfiles.clicked.connect(self.add_files)
         self.ui.btn_gensetup.clicked.connect(self.generate_setup)
         
         self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
         self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
-       
-        # hou.ui.mainQtWindow().setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-    
-    
+        
+        self.paths_list = [] 
+        
+        self.input_index = 0
         
     def add_files(self):
         files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
         files = files.split(" ; ")
         
         for filepath in files:
-            self.add_item(filepath)
+            if filepath != "" and filepath not in self.paths_list:
+                self.add_item(filepath)
         
     def add_item(self, filepath):
+        self.paths_list.append(filepath)
         widget = List_Item_Widget(filepath)
         list_item = QtWidgets.QListWidgetItem()
         list_item.setSizeHint(QtCore.QSize(90,75))
         self.ui.list_textures.addItem(list_item)
         self.ui.list_textures.setItemWidget(list_item, widget)
     
+    def info_clean(self):
+        self.ui.label_info.setText("")
+        self.ui.label_info.setStyleSheet("")
+    
+    def info_display_error(self, error_message):
+        self.ui.label_info.setText(error_message)
+        self.ui.label_info.setStyleSheet("color:#fc979a;")
+        
     def generate_setup(self):
+        self.info_clean()
+    
         if self.validate_item_types() == False:
-            print("Some textures don't have their type assigned. Aborting.")
+            self.info_display_error("Some textures don't have their type assigned. Aborting.")
             return
     
         stage = hou.node("/stage/materiallibrary1")
         
+        if self.ui.cb_wipe_network.isChecked() == True:
+            self.wipe_network(stage)
+        
         collect = stage.createNode("collect")
-        input_index = 0
-
-        mtlx_mat = stage.createNode("mtlxstandard_surface")
-        mtlx_mat.setGenericFlag(hou.nodeFlag.Material, False)
-        collect.setInput(input_index, mtlx_mat)
-        input_index += 1
         
         
-        mtlx_albedo = stage.createNode("mtlximage")
-        
-        mtlx_mat.setInput(1, mtlx_albedo)
-
-        
+        for engine in engines:
+            engine_checkbox = getattr(self.ui, engine_lookup[engine]["checkbox"], None) 
+            
+            if engine_checkbox.isChecked() == True:
+                main_node = stage.createNode(engine_lookup[engine]["main_node"])
+                main_node.setGenericFlag(hou.nodeFlag.Material, False)
+                
+                last_node = main_node
+           
+                for intermediary_node in engine_lookup[engine]["material_intermediary_nodes"]:
+                    if intermediary_node == 'redshift::Sprite':
+                        if self.ui.cb_enablerssprite.isChecked() == False:
+                            continue
+                        elif self.is_there_opacity_map() == False:
+                            continue
+                    inter_node = stage.createNode(intermediary_node)
+                    inter_node.setGenericFlag(hou.nodeFlag.Material, False)
+                    self.redshift_output = inter_node
+                    inter_node.setInput(0, last_node)
+                    last_node = inter_node
+                    
+                collect.setInput(self.input_index, last_node)
+                self.input_index += 1
+                
+                    
+                for index in range(self.ui.list_textures.count()):
+                    widget = self.get_item_widget(index)
+                    
+                    type = type_lookup[widget.ui.texture_type.currentIndex()]
+                    
+                    file_path = widget.path
+                    
+                    self.create_image_node(stage, engine, collect, main_node, type, file_path)
+              
         stage.layoutChildren()
+        self.input_index = 0
         
+    def get_item_widget(self, index):
+        item = self.ui.list_textures.item(index)
+        widget = self.ui.list_textures.itemWidget(item)
+        return widget
+                    
     def validate_item_types(self):
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
@@ -81,7 +247,50 @@ class MaterialCreator(QtWidgets.QWidget):
             if widget.ui.texture_type.currentIndex() == -1:
                 return False
         return True
+    def is_there_opacity_map(self):
+        for index in range(self.ui.list_textures.count()):
+            item = self.ui.list_textures.item(index)
+            widget = self.ui.list_textures.itemWidget(item)
+            
+            if widget.ui.texture_type.currentIndex() == opacity_index:
+                return True
+        return False
          
+    def create_image_node(self, stage, engine, collect, main_node, type, file_path):
+        img_node = stage.createNode(engine_lookup[engine]["image_node"])
+        
+        img_parm = engine_lookup[engine]["image_parms"]
+        
+        img_node.parm(img_parm["type"]).set(img_parm["mode"][type])
+        img_node.parm(img_parm["filepath"]).set(file_path)
+        
+        
+        if type in engine_lookup[engine]["image_intermediary_nodes"]:
+            intermediary_dict = engine_lookup[engine]["image_intermediary_nodes"][type]
+            node_to_create = intermediary_dict["node"]
+            input_index = intermediary_dict["input"]
+            parms_to_change = intermediary_dict["parms_to_change"]
+            connect_target = intermediary_dict["target"]
+            
+            intermediary = stage.createNode(node_to_create)
+            intermediary.setGenericFlag(hou.nodeFlag.Material, False)
+            intermediary.setInput(input_index, img_node)
+            intermediary.setParms(parms_to_change)
+            
+            if connect_target == "main_node":
+                main_node.setInput(engine_lookup[engine]["main_inputs"][type], intermediary)
+            elif connect_target == "intermediary_output":
+                self.redshift_output.setInput(1, intermediary)
+            elif connect_target == "collect":
+                collect.setInput(self.input_index, intermediary)
+                self.input_index += 1
+                
+        else:
+            main_node.setInput(engine_lookup[engine]["main_inputs"][type], img_node)
+    
+    def wipe_network(self, network):
+        for child_node in network.children():
+            child_node.destroy()
 
         
     
@@ -92,11 +301,14 @@ class List_Item_Widget(QtWidgets.QWidget):
         ui_file = hou.expandString('$AMMATBUILD/list_item.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
         
+        self.path = filepath
+        
         resolved_path = hou.expandString(filepath)
         file_name = os.path.basename(resolved_path)
         
         
         self.ui.file_path.setText(file_name)
+        self.ui.file_path.setToolTip(file_name)
         
         type = self.detect_texture_type(file_name)
         self.ui.texture_type.setCurrentIndex(type)
@@ -144,6 +356,8 @@ class List_Item_Widget(QtWidgets.QWidget):
             if list.itemWidget(item) == self:
                 list.takeItem(list.row(item))
                 break
+        
+        list.parent().parent().paths_list.remove(self.path)
 
         
 

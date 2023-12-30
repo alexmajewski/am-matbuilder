@@ -44,24 +44,51 @@
       <number>0</number>
      </property>
      <item>
-      <widget class="QLabel" name="GeoCreator">
-       <property name="text">
-        <string>Texture Image Files</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_5">
+       <item>
+        <widget class="QLabel" name="label_listheader">
+         <property name="text">
+          <string>Texture Image Files</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_addfiles">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Add Files</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
      <item>
       <widget class="QListWidget" name="list_textures"/>
      </item>
      <item>
-      <widget class="QPushButton" name="btn_addfiles">
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
+      <widget class="QLabel" name="label_author">
+       <property name="styleSheet">
+        <string notr="true">color: rgba(255, 255, 255, 0.2);</string>
        </property>
        <property name="text">
-        <string>Add Files</string>
+        <string>Created by Alex Majewski</string>
        </property>
       </widget>
      </item>
@@ -141,6 +168,20 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="cb_wipe_network">
+       <property name="toolTip">
+        <string>Deletes all other nodes in the material network. 
+Recommended when re-using older setups or re-generating current material.</string>
+       </property>
+       <property name="text">
+        <string>Wipe Network On Creation</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -155,10 +196,35 @@
      </item>
      <item>
       <widget class="QLabel" name="label_info">
+       <property name="maximumSize">
+        <size>
+         <width>200</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string/>
        </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
       </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Maximum</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>5</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item>
       <widget class="QPushButton" name="btn_gensetup">
