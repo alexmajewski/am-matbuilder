@@ -48,7 +48,7 @@
        <item>
         <widget class="QLabel" name="label_listheader">
          <property name="text">
-          <string>Texture Image Files</string>
+          <string>Texture Image Files:</string>
          </property>
         </widget>
        </item>
@@ -80,7 +80,14 @@
       </layout>
      </item>
      <item>
-      <widget class="QListWidget" name="list_textures"/>
+      <widget class="QListWidget" name="list_textures">
+       <property name="acceptDrops">
+        <bool>false</bool>
+       </property>
+       <property name="dragDropMode">
+        <enum>QAbstractItemView::NoDragDrop</enum>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QLabel" name="label_author">

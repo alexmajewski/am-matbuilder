@@ -7,15 +7,15 @@
 
   <toolshelf name="am_matbuilder" label="AM Mat Builder">
     <memberTool name="tool_4"/>
-    <memberTool name="tool_5"/>
+    <memberTool name="am_matbuilder"/>
   </toolshelf>
 
-  <tool name="tool_5" label="Customtool" icon="PLASMA_App">
+  <tool name="am_matbuilder" label="AMMatBuilder" icon="PLASMA_App">
     <script scriptType="python"><![CDATA[import hou
 import os
-from PySide2 import QtCore, QtUiTools, QtWidgets
+from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Alex Majewski"
 
 
@@ -39,7 +39,7 @@ engine_lookup = {
         "image_parms": {
             "type": "signature",
             "mode": {
-                "base_color": "default",
+                "base_color": "color3",
                 "metallness": "default",
                 "roughness": "default",
                 "transmission": "default",
@@ -146,6 +146,7 @@ class MaterialCreator(QtWidgets.QWidget):
         ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        self.setWindowTitle("Solaris Multi-Engine Material Builder")
         self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
         
         self.ui.btn_addfiles.clicked.connect(self.add_files)
@@ -154,10 +155,11 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
         self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
         
+        
         self.paths_list = [] 
         
         self.input_index = 0
-        
+
     def add_files(self):
         files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
         files = files.split(" ; ")
@@ -189,7 +191,8 @@ class MaterialCreator(QtWidgets.QWidget):
             self.info_display_error("Some textures don't have their type assigned. Aborting.")
             return
     
-        stage = hou.node("/stage/materiallibrary1")
+        network_editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+        stage = network_editor.pwd()
         
         if self.ui.cb_wipe_network.isChecked() == True:
             self.wipe_network(stage)
@@ -318,10 +321,20 @@ class List_Item_Widget(QtWidgets.QWidget):
     def detect_texture_type(self, file_name):
         file_name = file_name.lower()
         
-        base_color_names = ["color", "diffuse", "albedo"]
+        base_color_names = ["color", "diff", "albedo"]
         opacity_names = ["opacity", "alpha", "transparency"]
         height_names = ["displace", "height"]
-        
+  
+        if "nor" in file_name:
+            return 3
+        elif "metallic" in file_name:
+            return 1
+        elif "rough" in file_name:
+            return 2
+        elif "bump" in file_name:
+            return 5
+        elif "emission" in file_name:
+            return 7
         
         for name in base_color_names:
             if name.lower() in file_name:
@@ -335,16 +348,7 @@ class List_Item_Widget(QtWidgets.QWidget):
             if name.lower() in file_name:
                 return 4
         
-        if "metallic" in file_name:
-            return 1
-        elif "roughness" in file_name:
-            return 2
-        elif "normal" in file_name:
-            return 3
-        elif "bump" in file_name:
-            return 5
-        elif "emission" in file_name:
-            return 7
+        
             
         return -1
         
