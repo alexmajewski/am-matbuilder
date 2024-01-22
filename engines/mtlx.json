@@ -1,0 +1,49 @@
+{
+    "MaterialX": {
+        "checkbox": "cb_use_mtlx",
+        "main_node": "mtlxstandard_surface",
+        "main_inputs": {
+            "base_color": 1,
+            "metallness": 3,
+            "roughness": 6,
+            "transmission": 10,
+            "emission_color": 36,
+            "opacity": 38,
+            "normal": 40,
+            "bump": 40
+        },
+        "material_intermediary_nodes": [],
+        "image_node": "mtlximage",
+        "image_parms": {
+            "type": "signature",
+            "mode": {
+                "base_color": "color3",
+                "metallness": "default",
+                "roughness": "default",
+                "transmission": "default",
+                "emission_color": "default",
+                "opacity": "default",
+                "normal": "vector3",
+                "displacement": "default",
+                "bump": "default"
+                
+            },
+            "filepath": "file"
+        },
+        "image_intermediary_nodes": {
+            "normal": {
+                "node": "mtlxnormalmap",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "main_node"
+            },
+            "displacement": {
+                "node": "mtlxdisplacement",
+                "input": 0,
+                "parms_to_change": {},
+                "target": "collect"
+            }
+            
+        }
+    }
+}

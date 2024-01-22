@@ -6,125 +6,28 @@
  a single file. -->
 
   <toolshelf name="am_matbuilder" label="AM Mat Builder">
-    <memberTool name="tool_4"/>
     <memberTool name="am_matbuilder"/>
   </toolshelf>
 
-  <tool name="am_matbuilder" label="AMMatBuilder" icon="PLASMA_App">
+  <tool name="am_matbuilder" label="Matbuilder" icon="LOP_materiallibrary">
     <script scriptType="python"><![CDATA[import hou
 import os
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
+import json
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Alex Majewski"
 
+lookup = {}
 
-engines = ["MaterialX", "Redshift"]
-engine_lookup = {
-    "MaterialX" : {
-        "checkbox": "cb_use_mtlx",
-        "main_node": "mtlxstandard_surface",
-        "main_inputs": {
-            "base_color": 1,
-            "metallness": 3,
-            "roughness": 6,
-            "transmission": 10,
-            "emission_color": 36,
-            "opacity": 38,
-            "normal": 40,
-            "bump": 40
-        },
-        "material_intermediary_nodes": [],
-        "image_node": "mtlximage",
-        "image_parms": {
-            "type": "signature",
-            "mode": {
-                "base_color": "color3",
-                "metallness": "default",
-                "roughness": "default",
-                "transmission": "default",
-                "emission_color": "default",
-                "opacity": "default",
-                "normal": "vector3",
-                "displacement": "default",
-                "bump": "default"
-                
-            },
-            "filepath": "file"
-        },
-        "image_intermediary_nodes": {
-            "normal": {
-                "node": "mtlxnormalmap",
-                "input": 0,
-                "parms_to_change": {},
-                "target": "main_node"
-            },
-            "displacement": {
-                "node": "mtlxdisplacement",
-                "input": 0,
-                "parms_to_change": {},
-                "target": "collect"
-            }
-            
-        }
-    },
-    "Redshift": {
-        "checkbox": "cb_use_redshift",
-        "main_node": "redshift::StandardMaterial",
-        "main_inputs": {
-            "base_color": 0,
-            "metallness": 3,
-            "roughness": 6,
-            "transmission": 10,
-            "emission_color": 32,
-            "opacity": 33,
-            "normal": 34,
-            "bump": 34
-        },
-        "material_intermediary_nodes": ['redshift::Sprite','redshift_usd_material'],
+json_dir = hou.expandString("$AMMATBUILD/engines")
+for filename in os.listdir(json_dir):
 
-        "image_node": "redshift::TextureSampler",
-        "image_parms": {
-            "type": "tex0_colorSpace",
-            "mode": {
-                "base_color": "sRGB",
-                "metallness": "Raw",
-                "roughness": "Raw",
-                "transmission": "Raw",
-                "emission_color": "Raw",
-                "opacity": "Raw",
-                "normal": "Raw",
-                "displacement": "Raw",
-                "bump": "Raw"
-            },
-            "filepath": "tex0"
-        },
-        "image_intermediary_nodes": {
-            "normal": {
-                "node": "redshift::BumpMap",
-                "input": 0,
-                "parms_to_change": {
-                    "inputType": "1"
-                },
-                "target": "main_node"
-            },
-            "bump": {
-                "node": "redshift::BumpMap",
-                "input": 0,
-                "parms_to_change": {},
-                "target": "main_node"
-            },
-            
-            "displacement": {
-                "node": "redshift::Displacement",
-                "input": 0,
-                "parms_to_change": {},
-                "target": "intermediary_output"
-            }
-        }
-
-    }
-}
+    if filename.endswith(".json"):
+        with open(os.path.join(json_dir, filename), "r") as file:
+            json_data = json.load(file)
+            first_key = list(json_data.keys())[0]
+            lookup[first_key] = json_data[first_key]
 
 type_lookup = {
     0: "base_color",
@@ -145,7 +48,16 @@ class MaterialCreator(QtWidgets.QWidget):
         super(MaterialCreator,self).__init__()
         ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
+        
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        layout.addWidget(self.ui)
+        
+        self.resize(769,568)
+        
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        
         self.setWindowTitle("Solaris Multi-Engine Material Builder")
         self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
         
@@ -155,18 +67,49 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
         self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
         
+        self.ui.list_textures.setAcceptDrops(True)
+        self.ui.list_textures.installEventFilter(self)
         
         self.paths_list = [] 
         
         self.input_index = 0
-
+    
     def add_files(self):
         files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
         files = files.split(" ; ")
-        
+        self.create_items_from_list(files)
+                
+    def create_items_from_list(self, files):
         for filepath in files:
             if filepath != "" and filepath not in self.paths_list:
                 self.add_item(filepath)
+                
+    def eventFilter(self, source, event):
+        if event.type() == QtCore.QEvent.Drop:
+            if event.mimeData().hasUrls():
+                if event.mimeData().hasUrls():
+                    event.setDropAction(QtCore.Qt.CopyAction)
+                    event.accept()
+                    
+                    files = []
+                    
+                    for url in event.mimeData().urls():
+                        if url.isLocalFile():
+                            files.append(str(url.toLocalFile()))
+                        else:
+                            files.append(str(url.toString()))
+                            
+                    self.create_items_from_list(files)
+                else:
+                    event.ignore()
+            
+        if event.type() == QtCore.QEvent.DragEnter:
+            return True
+        # elif event.type() == QtCore.QEvent.DragMove:
+        #     print("Drag Move Event")
+            # Handle drag move event here
+            # return True
+        return super(MaterialCreator, self).eventFilter(source, event)
         
     def add_item(self, filepath):
         self.paths_list.append(filepath)
@@ -200,16 +143,16 @@ class MaterialCreator(QtWidgets.QWidget):
         collect = stage.createNode("collect")
         
         
-        for engine in engines:
-            engine_checkbox = getattr(self.ui, engine_lookup[engine]["checkbox"], None) 
+        for engine in lookup.keys():
+            engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
             
             if engine_checkbox.isChecked() == True:
-                main_node = stage.createNode(engine_lookup[engine]["main_node"])
+                main_node = stage.createNode(lookup[engine]["main_node"])
                 main_node.setGenericFlag(hou.nodeFlag.Material, False)
                 
                 last_node = main_node
            
-                for intermediary_node in engine_lookup[engine]["material_intermediary_nodes"]:
+                for intermediary_node in lookup[engine]["material_intermediary_nodes"]:
                     if intermediary_node == 'redshift::Sprite':
                         if self.ui.cb_enablerssprite.isChecked() == False:
                             continue
@@ -260,16 +203,16 @@ class MaterialCreator(QtWidgets.QWidget):
         return False
          
     def create_image_node(self, stage, engine, collect, main_node, type, file_path):
-        img_node = stage.createNode(engine_lookup[engine]["image_node"])
+        img_node = stage.createNode(lookup[engine]["image_node"])
         
-        img_parm = engine_lookup[engine]["image_parms"]
+        img_parm = lookup[engine]["image_parms"]
         
         img_node.parm(img_parm["type"]).set(img_parm["mode"][type])
         img_node.parm(img_parm["filepath"]).set(file_path)
         
         
-        if type in engine_lookup[engine]["image_intermediary_nodes"]:
-            intermediary_dict = engine_lookup[engine]["image_intermediary_nodes"][type]
+        if type in lookup[engine]["image_intermediary_nodes"]:
+            intermediary_dict = lookup[engine]["image_intermediary_nodes"][type]
             node_to_create = intermediary_dict["node"]
             input_index = intermediary_dict["input"]
             parms_to_change = intermediary_dict["parms_to_change"]
@@ -281,7 +224,7 @@ class MaterialCreator(QtWidgets.QWidget):
             intermediary.setParms(parms_to_change)
             
             if connect_target == "main_node":
-                main_node.setInput(engine_lookup[engine]["main_inputs"][type], intermediary)
+                main_node.setInput(lookup[engine]["main_inputs"][type], intermediary)
             elif connect_target == "intermediary_output":
                 self.redshift_output.setInput(1, intermediary)
             elif connect_target == "collect":
@@ -289,20 +232,24 @@ class MaterialCreator(QtWidgets.QWidget):
                 self.input_index += 1
                 
         else:
-            main_node.setInput(engine_lookup[engine]["main_inputs"][type], img_node)
+            main_node.setInput(lookup[engine]["main_inputs"][type], img_node)
     
     def wipe_network(self, network):
         for child_node in network.children():
             child_node.destroy()
 
-        
-    
 
 class List_Item_Widget(QtWidgets.QWidget):
     def __init__(self, filepath, parent=None):
         super().__init__(parent)
         ui_file = hou.expandString('$AMMATBUILD/list_item.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
+        
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        layout.addWidget(self.ui)
+        
         
         self.path = filepath
         
@@ -327,7 +274,7 @@ class List_Item_Widget(QtWidgets.QWidget):
   
         if "nor" in file_name:
             return 3
-        elif "metallic" in file_name:
+        elif "metal" in file_name:
             return 1
         elif "rough" in file_name:
             return 2
