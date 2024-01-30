@@ -15,7 +15,7 @@ import os
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -57,6 +57,7 @@ class MaterialCreator(QtWidgets.QWidget):
         self.resize(769,568)
         
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        self.setWindowFlags(QtCore.Qt.Tool)
         
         self.setWindowTitle("Solaris Multi-Engine Material Builder")
         self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
