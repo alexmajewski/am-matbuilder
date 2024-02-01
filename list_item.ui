@@ -56,6 +56,9 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="editable">
+      <bool>false</bool>
+     </property>
      <item>
       <property name="text">
        <string>Base Color</string>

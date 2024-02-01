@@ -15,7 +15,7 @@ import os
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 
-__version__ = "0.2.2"
+__version__ = "0.2.5"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -72,10 +72,18 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.list_textures.installEventFilter(self)
         
         self.paths_list = [] 
+        self.maps = []
         
-        self.input_index = 0
+        self.center_window()
+    
+    def center_window(self):
+        center = hou.ui.mainQtWindow().geometry().center()
+        self.move(center - self.geometry().center())
     
     def add_files(self):
+        """
+        Adds image files using a button.
+        """
         files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
         files = files.split(" ; ")
         self.create_items_from_list(files)
@@ -86,6 +94,9 @@ class MaterialCreator(QtWidgets.QWidget):
                 self.add_item(filepath)
                 
     def eventFilter(self, source, event):
+        """
+        Accepts dropping image files into the list.
+        """
         if event.type() == QtCore.QEvent.Drop:
             if event.mimeData().hasUrls():
                 if event.mimeData().hasUrls():
@@ -112,13 +123,40 @@ class MaterialCreator(QtWidgets.QWidget):
             # return True
         return super(MaterialCreator, self).eventFilter(source, event)
         
+    def update_maps(self, clicked_widget, newly_set_value):
+        """
+        Ensures that all textures on the list are set to a unique value.
+        It's called any time a combo box value is changed.
+        """
+        for index in range(self.ui.list_textures.count()):
+            item = self.ui.list_textures.item(index)
+            item_widget = self.ui.list_textures.itemWidget(item)
+            combo_box = item_widget.ui.texture_type 
+            
+            if item_widget != clicked_widget:
+                if combo_box.currentIndex() == newly_set_value:
+                    combo_box.setCurrentIndex(-1)
+                else:
+                    pass
+            else:
+                pass
+        
     def add_item(self, filepath):
+        """
+        Adds a new item to the QListWidget,
+        And creates and attaches a new List_Item_Widget to it. 
+        """
         self.paths_list.append(filepath)
-        widget = List_Item_Widget(filepath)
+        
         list_item = QtWidgets.QListWidgetItem()
         list_item.setSizeHint(QtCore.QSize(90,75))
         self.ui.list_textures.addItem(list_item)
+        
+        widget = List_Item_Widget(filepath)
         self.ui.list_textures.setItemWidget(list_item, widget)
+
+        widget.ui.texture_type.currentIndexChanged.connect(lambda new_value=widget.ui.texture_type.currentText(): self.update_maps(widget, new_value))
+  
     
     def info_clean(self):
         self.ui.label_info.setText("")
@@ -129,64 +167,133 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.label_info.setStyleSheet("color:#fc979a;")
         
     def generate_setup(self):
-        self.info_clean()
+        network_editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+        stage = network_editor.pwd()
     
+        self.info_clean()
+        
         if self.validate_item_types() == False:
             self.info_display_error("Some textures don't have their type assigned. Aborting.")
             return
-    
-        network_editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
-        stage = network_editor.pwd()
         
         if self.ui.cb_wipe_network.isChecked() == True:
             self.wipe_network(stage)
         
         collect = stage.createNode("collect")
         
-        
         for engine in lookup.keys():
-            engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
+            # engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
             
-            if engine_checkbox.isChecked() == True:
-                main_node = stage.createNode(lookup[engine]["main_node"])
-                main_node.setGenericFlag(hou.nodeFlag.Material, False)
+            # if engine_checkbox.isChecked() == True:
+            subnet = stage.createNode("subnet")
+            
+            self.process_node_recursive(subnet, lookup[engine]["nodes"]["children"][0], subnet.node("suboutput1"))
                 
-                last_node = main_node
-           
-                for intermediary_node in lookup[engine]["material_intermediary_nodes"]:
-                    if intermediary_node == 'redshift::Sprite':
-                        if self.ui.cb_enablerssprite.isChecked() == False:
-                            continue
-                        elif self.is_there_opacity_map() == False:
-                            continue
-                    inter_node = stage.createNode(intermediary_node)
-                    inter_node.setGenericFlag(hou.nodeFlag.Material, False)
-                    self.redshift_output = inter_node
-                    inter_node.setInput(0, last_node)
-                    last_node = inter_node
-                    
-                collect.setInput(self.input_index, last_node)
-                self.input_index += 1
-                
-                    
-                for index in range(self.ui.list_textures.count()):
-                    widget = self.get_item_widget(index)
-                    
-                    type = type_lookup[widget.ui.texture_type.currentIndex()]
-                    
-                    file_path = widget.path
-                    
-                    self.create_image_node(stage, engine, collect, main_node, type, file_path)
-              
+        subnet.layoutChildren()
         stage.layoutChildren()
         self.input_index = 0
+            
+    def get_path_by_type(self, desired_type):
         
+        desired_type_num = -1
+        
+        print(f"JSON calls for type: {desired_type}")
+    
+        for key, value in type_lookup.items():
+            if value == desired_type:
+                desired_type_num = key
+        
+        print(f"this map is number {desired_type_num} on the internal list")
+        
+        for index in range(self.ui.list_textures.count()):
+            item = self.ui.list_textures.item(index)
+            item_widget = self.ui.list_textures.itemWidget(item)
+            combo_box = item_widget.ui.texture_type 
+            
+            if combo_box.currentIndex() == desired_type_num:
+                print("THIS TYPE IS PRESENT IN COMBO BOXES")
+                return item_widget.path
+        print("cant find this type in current items")
+        return None
+    
+    def is_condition_met(self, condition):
+        if "ui_checkbox" in condition:
+            checkbox = getattr(self.ui, condition["ui_checkbox"], None)
+            if "value" in condition:
+                value = condition["value"]
+                
+                if checkbox.isChecked()  == value:
+                    return True
+                else:
+                    return False
+        
+    def process_node_recursive(self, subnet, json_object, parent=None):
+        """
+        Recursively creates nodes from an object in a json file.
+        """
+        print("-----------------------------")
+        print(f"CURRENTLY PROCESSING: {json_object['type']}")
+        if "condition" not in json_object or "condition" in json_object and self.is_condition_met(json_object["condition"]):
+             
+            if 'map' in json_object:
+                
+                map = json_object['map']
+                path = self.get_path_by_type(map)
+                
+                if path != None:
+                    node = subnet.createNode(json_object['type'])
+                    
+                    # connect to parent
+                    if parent != None and "connect_to" in json_object:
+                        parent.setInput(json_object["connect_to"], node)
+                    
+                    # set parameters
+                    if 'parms' in json_object:
+                        for key, value in json_object['parms'].items():
+                            if "{{path}}" in value:
+                                json_object['parms'][key] = path
+                                
+                        node.setParms(json_object['parms'])
+                        
+                    #connect to parent
+                    if parent != None and "connect_to" in json_object:
+                        parent.setInput(json_object["connect_to"], node)
+                        
+                    for child_node in json_object.get("children", []):
+                        self.process_node_recursive(subnet, child_node, node)
+                else:
+                    # skip this node and continue recursion
+                    for child_node in json_object.get("children", []):
+                        self.process_node_recursive(subnet, child_node, parent)
+            
+            else:
+                print(f"MAP not present in json_object, currently processing {json_object['type']}")
+                node = subnet.createNode(json_object['type'])
+                
+                if 'parms' in json_object:
+                    node.setParms(json_object['parms'])
+                
+                #connect to parent
+                if parent != None and "connect_to" in json_object:
+                    parent.setInput(json_object["connect_to"], node)
+                    
+                for child_node in json_object.get("children", []):
+                    self.process_node_recursive(subnet, child_node, node)
+        else:
+            # skip this node and continue recursion
+            for child_node in json_object.get("children", []):
+                self.process_node_recursive(subnet, child_node, parent)
+            
+
     def get_item_widget(self, index):
         item = self.ui.list_textures.item(index)
         widget = self.ui.list_textures.itemWidget(item)
         return widget
                     
     def validate_item_types(self):
+        """
+        Checks if all textures have an assigned type.
+        """
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
             widget = self.ui.list_textures.itemWidget(item)
@@ -194,6 +301,7 @@ class MaterialCreator(QtWidgets.QWidget):
             if widget.ui.texture_type.currentIndex() == -1:
                 return False
         return True
+        
     def is_there_opacity_map(self):
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
@@ -203,37 +311,7 @@ class MaterialCreator(QtWidgets.QWidget):
                 return True
         return False
          
-    def create_image_node(self, stage, engine, collect, main_node, type, file_path):
-        img_node = stage.createNode(lookup[engine]["image_node"])
-        
-        img_parm = lookup[engine]["image_parms"]
-        
-        img_node.parm(img_parm["type"]).set(img_parm["mode"][type])
-        img_node.parm(img_parm["filepath"]).set(file_path)
-        
-        
-        if type in lookup[engine]["image_intermediary_nodes"]:
-            intermediary_dict = lookup[engine]["image_intermediary_nodes"][type]
-            node_to_create = intermediary_dict["node"]
-            input_index = intermediary_dict["input"]
-            parms_to_change = intermediary_dict["parms_to_change"]
-            connect_target = intermediary_dict["target"]
-            
-            intermediary = stage.createNode(node_to_create)
-            intermediary.setGenericFlag(hou.nodeFlag.Material, False)
-            intermediary.setInput(input_index, img_node)
-            intermediary.setParms(parms_to_change)
-            
-            if connect_target == "main_node":
-                main_node.setInput(lookup[engine]["main_inputs"][type], intermediary)
-            elif connect_target == "intermediary_output":
-                self.redshift_output.setInput(1, intermediary)
-            elif connect_target == "collect":
-                collect.setInput(self.input_index, intermediary)
-                self.input_index += 1
-                
-        else:
-            main_node.setInput(lookup[engine]["main_inputs"][type], img_node)
+
     
     def wipe_network(self, network):
         for child_node in network.children():
@@ -265,6 +343,8 @@ class List_Item_Widget(QtWidgets.QWidget):
         self.ui.texture_type.setCurrentIndex(type)
         
         self.ui.btn_destroy.clicked.connect(self.destroy)
+        
+
         
     def detect_texture_type(self, file_name):
         file_name = file_name.lower()
@@ -316,6 +396,88 @@ class List_Item_Widget(QtWidgets.QWidget):
         
     
 win = MaterialCreator()
-win.show()]]></script>
+win.show()
+
+
+
+
+
+            
+            
+        
+        # for engine in lookup.keys():
+        #     engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
+            
+        #     if engine_checkbox.isChecked() == True:
+        #         main_node = stage.createNode(lookup[engine]["main_node"])
+        #         main_node.setGenericFlag(hou.nodeFlag.Material, False)
+                
+        #         last_node = main_node
+           
+        #         for intermediary_node in lookup[engine]["material_intermediary_nodes"]:
+        #             if intermediary_node == 'redshift::Sprite':
+        #                 if self.ui.cb_enablerssprite.isChecked() == False:
+        #                     continue
+        #                 elif self.is_there_opacity_map() == False:
+        #                     continue
+        #             inter_node = stage.createNode(intermediary_node)
+        #             inter_node.setGenericFlag(hou.nodeFlag.Material, False)
+        #             self.redshift_output = inter_node
+        #             inter_node.setInput(0, last_node)
+        #             last_node = inter_node
+                    
+        #         collect.setInput(self.input_index, last_node)
+        #         self.input_index += 1
+                
+                    
+        #         for index in range(self.ui.list_textures.count()):
+        #             widget = self.get_item_widget(index)
+                    
+        #             type = type_lookup[widget.ui.texture_type.currentIndex()]
+                    
+        #             file_path = widget.path
+                    
+        #             self.create_image_node(stage, engine, collect, main_node, type, file_path)
+              
+        # stage.layoutChildren()
+        # self.input_index = 0
+        
+        
+        
+        
+        
+        
+        
+            # def create_image_node(self, stage, engine, collect, main_node, type, file_path):
+    #     img_node = stage.createNode(lookup[engine]["image_node"])
+        
+    #     img_parm = lookup[engine]["image_parms"]
+        
+    #     img_node.parm(img_parm["type"]).set(img_parm["mode"][type])
+    #     img_node.parm(img_parm["filepath"]).set(file_path)
+        
+        
+    #     if type in lookup[engine]["image_intermediary_nodes"]:
+    #         intermediary_dict = lookup[engine]["image_intermediary_nodes"][type]
+    #         node_to_create = intermediary_dict["node"]
+    #         input_index = intermediary_dict["input"]
+    #         parms_to_change = intermediary_dict["parms_to_change"]
+    #         connect_target = intermediary_dict["target"]
+            
+    #         intermediary = stage.createNode(node_to_create)
+    #         intermediary.setGenericFlag(hou.nodeFlag.Material, False)
+    #         intermediary.setInput(input_index, img_node)
+    #         intermediary.setParms(parms_to_change)
+            
+    #         if connect_target == "main_node":
+    #             main_node.setInput(lookup[engine]["main_inputs"][type], intermediary)
+    #         elif connect_target == "intermediary_output":
+    #             self.redshift_output.setInput(1, intermediary)
+    #         elif connect_target == "collect":
+    #             collect.setInput(self.input_index, intermediary)
+    #             self.input_index += 1
+                
+    #     else:
+    #         main_node.setInput(lookup[engine]["main_inputs"][type], img_node)]]></script>
   </tool>
 </shelfDocument>

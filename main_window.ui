@@ -165,7 +165,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="cb_enablerssprite">
+      <widget class="QCheckBox" name="cb_use_rssprite">
        <property name="text">
         <string>Use RS Sprite for Opacity Map</string>
        </property>
