@@ -1,5 +1,12 @@
 {
     "Redshift": {
+        "engine_enable_checkbox": "cb_use_redshift",
+        "options_checkboxes": [
+            {
+                "ui_name": "cb_use_rssprite",
+                "name": "Use RS Sprite for Opacity Map"
+            }
+        ],
         "nodes": {
             "type": "suboutput",
             "children": [
@@ -84,6 +91,9 @@
                                         {
                                             "type": "redshift::BumpMap",
                                             "map": "normal",
+                                            "parms": {
+                                                "inputType": "1"
+                                            },
                                             "connect_to": 34,
                                             "children": [
                                                 {

@@ -126,21 +126,34 @@
       </widget>
      </item>
      <item>
-      <layout class="QVBoxLayout" name="engines_layout">
-       <property name="topMargin">
-        <number>0</number>
+      <widget class="QCheckBox" name="cb_use_mtlx">
+       <property name="enabled">
+        <bool>true</bool>
        </property>
-       <property name="bottomMargin">
-        <number>10</number>
+       <property name="text">
+        <string>MaterialX</string>
        </property>
-      </layout>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cb_use_redshift">
+       <property name="text">
+        <string>Redshift</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="Line" name="line">
        <property name="minimumSize">
         <size>
          <width>0</width>
-         <height>10</height>
+         <height>30</height>
         </size>
        </property>
        <property name="styleSheet">
@@ -152,28 +165,28 @@
       </widget>
      </item>
      <item>
-      <layout class="QVBoxLayout" name="engine_options_layout">
-       <property name="topMargin">
-        <number>10</number>
+      <widget class="QCheckBox" name="cb_use_rssprite">
+       <property name="text">
+        <string>Use RS Sprite for Opacity Map</string>
        </property>
-      </layout>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item>
-      <layout class="QVBoxLayout" name="main_options_layout">
-       <property name="bottomMargin">
-        <number>10</number>
+      <widget class="QCheckBox" name="cb_wipe_network">
+       <property name="toolTip">
+        <string>Deletes all other nodes in the material network. 
+Recommended when re-using older setups or re-generating current material.</string>
        </property>
-       <item>
-        <widget class="QCheckBox" name="cb_wipe_network">
-         <property name="text">
-          <string>Wipe Network on Creation</string>
-         </property>
-         <property name="checked">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
+       <property name="text">
+        <string>Wipe Network On Creation</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item>
       <spacer name="verticalSpacer">

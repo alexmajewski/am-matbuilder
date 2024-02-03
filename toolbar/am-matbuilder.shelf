@@ -14,8 +14,9 @@
 import os
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
+import sys
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -28,6 +29,7 @@ for filename in os.listdir(json_dir):
             json_data = json.load(file)
             first_key = list(json_data.keys())[0]
             lookup[first_key] = json_data[first_key]
+            
 
 type_lookup = {
     0: "base_color",
@@ -42,7 +44,6 @@ type_lookup = {
 # Dropdown menu indices:
 opacity_index = 6
 
-
 class MaterialCreator(QtWidgets.QWidget):
     def __init__(self):
         super(MaterialCreator,self).__init__()
@@ -56,11 +57,14 @@ class MaterialCreator(QtWidgets.QWidget):
         
         self.resize(769,568)
         
-        self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+        self.setParent(hou.qt.mainWindow(), QtCore.Qt.Window)
         self.setWindowFlags(QtCore.Qt.Tool)
         
         self.setWindowTitle("Solaris Multi-Engine Material Builder")
         self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
+        
+        settings_path = hou.expandString("$AMMATBUILD/settings.ini")
+        self.settings = QtCore.QSettings(settings_path, QtCore.QSettings.IniFormat)
         
         self.ui.btn_addfiles.clicked.connect(self.add_files)
         self.ui.btn_gensetup.clicked.connect(self.generate_setup)
@@ -72,9 +76,66 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.list_textures.installEventFilter(self)
         
         self.paths_list = [] 
-        self.maps = []
         
         self.center_window()
+        self.generate_engine_UI()
+        self.retrieve_settings()
+        
+    def save_settings(self):
+        self.settings.setValue(f"cb_wipe_network", self.ui.cb_wipe_network.isChecked())
+    
+        layouts = [self.ui.engines_layout, self.ui.engine_options_layout]
+        for layout in layouts:
+            for i in range(layout.count()):
+                widget = layout.itemAt(i).widget()
+                if isinstance(widget, QtWidgets.QCheckBox):
+                    self.settings.setValue(f"{widget.objectName()}", widget.isChecked())
+                    
+    def retrieve_settings(self):
+        if self.settings.contains("cb_wipe_network"):
+            self.ui.cb_wipe_network.setChecked(self.settings.value("cb_wipe_network"))
+    
+        # Note: using .itemAt(i) on .ui file widgets results in a bug
+        layouts = [self.ui.engines_layout, self.ui.engine_options_layout]
+        for layout in layouts:
+            for i in range(layout.count()):
+                widget = layout.itemAt(i).widget()
+                if widget is not None:
+                    widget_name = layout.itemAt(i).widget().objectName()
+                    if isinstance(widget, QtWidgets.QCheckBox):
+                        if self.settings.contains(layout.itemAt(i).widget().objectName()):
+                            layout.itemAt(i).widget().setChecked(self.settings.value(layout.itemAt(i).widget().objectName()))
+                        
+
+    def closeEvent(self, event):
+        self.save_settings()
+        event.accept()
+    
+    def generate_engine_UI(self):
+        """
+        Dynamically creates UI checkboxes from JSON files.
+        """
+        for engine in lookup:
+            # create engine enabling checkbox
+            checkbox_name = lookup[engine]["engine_enable_checkbox"]
+            checkbox_instance = QtWidgets.QCheckBox()
+            checkbox_instance.setText(engine)
+            checkbox_instance.setObjectName(checkbox_name)
+            checkbox_instance.setChecked(True)
+            setattr(self.ui, checkbox_name, checkbox_instance)
+            self.ui.engines_layout.addWidget(checkbox_instance)
+            
+            # create options checkboxes
+            if "options_checkboxes" in lookup[engine]:
+                for option in lookup[engine]["options_checkboxes"]:
+                    checkbox_name = option["ui_name"]
+                    checkbox_instance = QtWidgets.QCheckBox()
+                    checkbox_instance.setText(option["name"])
+                    checkbox_instance.setObjectName(checkbox_name)
+                    checkbox_instance.setChecked(True)
+                    setattr(self.ui, checkbox_name, checkbox_instance)
+                    self.ui.engine_options_layout.addWidget(checkbox_instance)
+        
     
     def center_window(self):
         center = hou.ui.mainQtWindow().geometry().center()
@@ -181,29 +242,24 @@ class MaterialCreator(QtWidgets.QWidget):
         
         collect = stage.createNode("collect")
         
+        
         for engine in lookup.keys():
-            # engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
+            engine_checkbox = getattr(self.ui, lookup[engine]["engine_enable_checkbox"], None) 
             
-            # if engine_checkbox.isChecked() == True:
-            subnet = stage.createNode("subnet")
-            
-            self.process_node_recursive(subnet, lookup[engine]["nodes"]["children"][0], subnet.node("suboutput1"))
-                
-        subnet.layoutChildren()
+            if engine_checkbox.isChecked() == True:            
+                subnet = stage.createNode("subnet")
+                self.process_node_recursive(subnet, lookup[engine]["nodes"]["children"][0], subnet.node("suboutput1"))
+                subnet.layoutChildren()
+
         stage.layoutChildren()
-        self.input_index = 0
             
     def get_path_by_type(self, desired_type):
         
         desired_type_num = -1
-        
-        print(f"JSON calls for type: {desired_type}")
     
         for key, value in type_lookup.items():
             if value == desired_type:
                 desired_type_num = key
-        
-        print(f"this map is number {desired_type_num} on the internal list")
         
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
@@ -211,9 +267,7 @@ class MaterialCreator(QtWidgets.QWidget):
             combo_box = item_widget.ui.texture_type 
             
             if combo_box.currentIndex() == desired_type_num:
-                print("THIS TYPE IS PRESENT IN COMBO BOXES")
                 return item_widget.path
-        print("cant find this type in current items")
         return None
     
     def is_condition_met(self, condition):
@@ -231,8 +285,6 @@ class MaterialCreator(QtWidgets.QWidget):
         """
         Recursively creates nodes from an object in a json file.
         """
-        print("-----------------------------")
-        print(f"CURRENTLY PROCESSING: {json_object['type']}")
         if "condition" not in json_object or "condition" in json_object and self.is_condition_met(json_object["condition"]):
              
             if 'map' in json_object:
@@ -267,7 +319,6 @@ class MaterialCreator(QtWidgets.QWidget):
                         self.process_node_recursive(subnet, child_node, parent)
             
             else:
-                print(f"MAP not present in json_object, currently processing {json_object['type']}")
                 node = subnet.createNode(json_object['type'])
                 
                 if 'parms' in json_object:
