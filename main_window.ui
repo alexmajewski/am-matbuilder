@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Material Builder</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0">
    <property name="sizeConstraint">
@@ -80,7 +80,7 @@
       </layout>
      </item>
      <item>
-      <widget class="QListWidget" name="list_textures">
+      <widget class="DragDropList" name="list_textures">
        <property name="acceptDrops">
         <bool>true</bool>
        </property>
@@ -236,6 +236,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DragDropList</class>
+   <extends>QListWidget</extends>
+   <header>dragdroplist-widget.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

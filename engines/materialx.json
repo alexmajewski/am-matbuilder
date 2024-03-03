@@ -1,0 +1,80 @@
+{
+    "MaterialX": {
+        "engine_enable_checkbox": "cb_use_mtlx",
+        "nodes": [
+            {
+                "type": "subnetconnector",
+                "output": true,
+                "parms": {
+                    "connectorkind": "output",
+                    "parmname": "surface",
+                    "parmlabel": "Surface",
+                    "parmtype": "surface"
+                },
+                "children": [
+                    {
+                        "type": "mtlxstandard_surface",
+                        "connect_to": 0,
+                        "children": [
+                            {
+                                "type": "mtlximage",
+                                "map": "base_color",
+                                "parms": {
+                                    "signature": "color3",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 1
+                            },
+                            {
+                                "type": "mtlximage",
+                                "map": "metallness",
+                                "parms": {
+                                    "signature": "default",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 3
+                            },
+                            {
+                                "type": "mtlximage",
+                                "map": "roughness",
+                                "parms": {
+                                    "signature": "default",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 6
+                            },
+                            {
+                                "type": "mtlximage",
+                                "map": "transmission",
+                                "parms": {
+                                    "signature": "default",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 10
+                            },
+                            {
+                                "type": "mtlximage",
+                                "map": "emission",
+                                "parms": {
+                                    "signature": "default",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 36
+                            },
+                            {
+                                "type": "mtlximage",
+                                "map": "opacity",
+                                "parms": {
+                                    "signature": "default",
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 38
+                            }
+                        ]
+                    }
+
+                ]
+            }
+        ]
+    }
+}

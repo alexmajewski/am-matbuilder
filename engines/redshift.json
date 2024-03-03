@@ -7,145 +7,147 @@
                 "name": "Use RS Sprite for Opacity Map"
             }
         ],
-        "nodes": {
-            "type": "suboutput",
-            "children": [
-                {
-                    "type": "redshift_usd_material",
-                    "connect_to": 0,
-                    "children": [
-                        {
-                            "type": "redshift::Sprite",
-                            "map": "opacity",
-                            "condition": {
-                                "ui_checkbox": "cb_use_rssprite",
-                                "value": true
+        "nodes": [
+            {
+                "type": "suboutput",
+                "children": [
+                    {
+                        "type": "redshift_usd_material",
+                        "connect_to": 0,
+                        "children": [
+                            {
+                                "type": "redshift::Sprite",
+                                "map": "opacity",
+                                "condition": {
+                                    "ui_checkbox": "cb_use_rssprite",
+                                    "value": true
+                                },
+                                "parms": {
+                                    "tex0": "{{path}}"
+                                },
+                                "connect_to": 0,
+                                "children": [
+                                    {
+                                        "type": "redshift::StandardMaterial",
+                                        "connect_to": 0,
+                                        "children": [
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "base_color",
+                                                "parms": {
+                                                    "tex0_colorSpace": "sRGB",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 0
+                                            },
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "metallness",
+                                                "parms": {
+                                                    "tex0_colorSpace": "Raw",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 3
+                                            },
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "roughness",
+                                                "parms": {
+                                                    "tex0_colorSpace": "Raw",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 6
+                                            },
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "transmission",
+                                                "parms": {
+                                                    "tex0_colorSpace": "Raw",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 10
+                                            },
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "emission",
+                                                "parms": {
+                                                    "tex0_colorSpace": "Raw",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 32
+                                            },
+                                            {
+                                                "type": "redshift::TextureSampler",
+                                                "map": "opacity",
+                                                "condition": {
+                                                    "ui_checkbox": "cb_use_rssprite",
+                                                    "value": false
+                                                },
+                                                "parms": {
+                                                    "tex0_colorSpace": "Raw",
+                                                    "tex0": "{{path}}"
+                                                },
+                                                "connect_to": 33
+                                            },
+                                            {
+                                                "type": "redshift::BumpMap",
+                                                "map": "normal",
+                                                "parms": {
+                                                    "inputType": "1"
+                                                },
+                                                "connect_to": 34,
+                                                "children": [
+                                                    {
+                                                        "type": "redshift::TextureSampler",
+                                                        "map": "normal",
+                                                        "parms": {
+                                                            "tex0_colorSpace": "Raw",
+                                                            "tex0": "{{path}}"
+                                                        },
+                                                        "connect_to": 0
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "redshift::BumpMap",
+                                                "map": "bump",
+                                                "connect_to": 34,
+                                                "children": [
+                                                    {
+                                                        "type": "redshift::TextureSampler",
+                                                        "map": "bump",
+                                                        "parms": {
+                                                            "tex0_colorSpace": "Raw",
+                                                            "tex0": "{{path}}"
+                                                        },
+                                                        "connect_to": 0
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
                             },
-                            "parms": {
-                                "tex0": "{{path}}"
-                            },
-                            "connect_to": 0,
-                            "children": [
-                                {
-                                    "type": "redshift::StandardMaterial",
-                                    "connect_to": 0,
-                                    "children": [
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "base_color",
-                                            "parms": {
-                                                "tex0_colorSpace": "sRGB",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 0
+                            {
+                                "type": "redshift::Displacement",
+                                "map": "displacement",
+                                "connect_to": 1,
+                                "children": [
+                                    {
+                                        "type": "redshift::TextureSampler",
+                                        "map": "displacement",
+                                        "parms": {
+                                            "tex0_colorSpace": "Raw",
+                                            "tex0": "{{path}}"
                                         },
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "metallness",
-                                            "parms": {
-                                                "tex0_colorSpace": "Raw",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 3
-                                        },
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "roughness",
-                                            "parms": {
-                                                "tex0_colorSpace": "Raw",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 6
-                                        },
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "transmission",
-                                            "parms": {
-                                                "tex0_colorSpace": "Raw",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 10
-                                        },
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "emission",
-                                            "parms": {
-                                                "tex0_colorSpace": "Raw",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 32
-                                        },
-                                        {
-                                            "type": "redshift::TextureSampler",
-                                            "map": "opacity",
-                                            "condition": {
-                                                "ui_checkbox": "cb_use_rssprite",
-                                                "value": false
-                                            },
-                                            "parms": {
-                                                "tex0_colorSpace": "Raw",
-                                                "tex0": "{{path}}"
-                                            },
-                                            "connect_to": 33
-                                        },
-                                        {
-                                            "type": "redshift::BumpMap",
-                                            "map": "normal",
-                                            "parms": {
-                                                "inputType": "1"
-                                            },
-                                            "connect_to": 34,
-                                            "children": [
-                                                {
-                                                    "type": "redshift::TextureSampler",
-                                                    "map": "normal",
-                                                    "parms": {
-                                                        "tex0_colorSpace": "Raw",
-                                                        "tex0": "{{path}}"
-                                                    },
-                                                    "connect_to": 0
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "type": "redshift::BumpMap",
-                                            "map": "bump",
-                                            "connect_to": 34,
-                                            "children": [
-                                                {
-                                                    "type": "redshift::TextureSampler",
-                                                    "map": "bump",
-                                                    "parms": {
-                                                        "tex0_colorSpace": "Raw",
-                                                        "tex0": "{{path}}"
-                                                    },
-                                                    "connect_to": 0
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "type": "redshift::Displacement",
-                            "map": "displacement",
-                            "connect_to": 1,
-                            "children": [
-                                {
-                                    "type": "redshift::TextureSampler",
-                                    "map": "displacement",
-                                    "parms": {
-                                        "tex0_colorSpace": "Raw",
-                                        "tex0": "{{path}}"
-                                    },
-                                    "connect_to": 0
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
+                                        "connect_to": 0
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 }

@@ -7,6 +7,13 @@
 
   <toolshelf name="am_matbuilder" label="AM Mat Builder">
     <memberTool name="am_matbuilder"/>
+    <memberTool name="tool_1"/>
+    <memberTool name="tool_2"/>
+    <memberTool name="tool_3"/>
+    <memberTool name="tool_4"/>
+    <memberTool name="tool_5"/>
+    <memberTool name="tool_6"/>
+    <memberTool name="tool_8"/>
   </toolshelf>
 
   <tool name="am_matbuilder" label="Matbuilder" icon="LOP_materiallibrary">
@@ -16,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.2.6"
+__version__ = "0.3.0"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -44,11 +51,161 @@ type_lookup = {
 # Dropdown menu indices:
 opacity_index = 6
 
+class DragDropList(QtWidgets.QListWidget):
+    """
+    List Widget subclass with drag & drop functionality
+    and displaying text information.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        
+        self.paths_list = [] 
+       
+        
+        self.instructions = {
+            "idle": "Add or drag and drop image texture files here",
+            "drag": "Drop images here"
+            }
+            
+        self.display_message = self.instructions['idle']
+        
+        self.setAcceptDrops(True)
+        self.drag = False
+        
+    def add_files(self):
+        """
+        Adds image files using a button.
+        """
+        files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
+        files = files.split(" ; ")
+        self.create_items_from_list(files)
+                
+    def create_items_from_list(self, files):
+        for filepath in files:
+            if filepath != "" and filepath not in self.paths_list:
+                self.add_item(filepath)
+                
+    def add_item(self, filepath):
+        """
+        Adds a new item to the QListWidget,
+        And creates and attaches a new List_Item_Widget to it. 
+        """
+        self.paths_list.append(filepath)
+        
+        list_item = QtWidgets.QListWidgetItem()
+        list_item.setSizeHint(QtCore.QSize(90,75))
+        self.addItem(list_item)
+        
+        widget = List_Item_Widget(filepath)
+        self.setItemWidget(list_item, widget)
+
+        widget.ui.texture_type.currentIndexChanged.connect(lambda new_value=widget.ui.texture_type.currentText(): self.update_maps(widget, new_value))
+        
+    def update_maps(self, clicked_widget, newly_set_value):
+        """
+        Ensures that all textures on the list are set to a unique value.
+        It's called any time a combo box value is changed.
+        """
+        for index in range(self.count()):
+            item = self.item(index)
+            item_widget = self.itemWidget(item)
+            combo_box = item_widget.ui.texture_type 
+            
+            if item_widget != clicked_widget:
+                if combo_box.currentIndex() == newly_set_value:
+                    combo_box.setCurrentIndex(-1)
+                else:
+                    pass
+            else:
+                pass
+
+        
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+            self.drag = True
+            self.update_text(self.instructions['drag'])
+        else:
+            event.ignore()
+        
+    def dragMoveEvent(self, event):
+        event.acceptProposedAction()
+            
+    def dragLeaveEvent(self, event):
+        self.update_text(self.instructions['idle'])
+        self.drag = False
+    
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            if event.mimeData().hasUrls():
+                event.setDropAction(QtCore.Qt.CopyAction)
+                event.accept()
+                
+                files = []
+                
+                for url in event.mimeData().urls():
+                    if url.isLocalFile():
+                        files.append(str(url.toLocalFile()))
+                    else:
+                        files.append(str(url.toString()))
+                        
+                self.create_items_from_list(files)
+                self.drag = False
+            else:
+                event.ignore()
+            
+    def update_text(self, text):
+        self.display_message = text
+        self.update()
+        
+    def paintEvent(self, event):
+        """
+        Draw placeholder text in the middle of the widget when it's empty
+        """
+        super().paintEvent(event)
+        
+        if self.count() == 0:
+            painter = QtGui.QPainter(self.viewport())
+            painter.save()
+            text_color = QtGui.QColor(150, 150, 150) 
+            dashed_line_color = text_color = QtGui.QColor(127, 127, 127, 150) 
+            painter.setPen(text_color)
+            
+            font = QtGui.QFont()
+            font.setPointSize(9)
+            painter.setFont(font)
+            
+            fm = self.fontMetrics()
+            elided_text = fm.elidedText(
+                self.display_message, QtCore.Qt.ElideRight, self.viewport().width()
+            )
+            painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
+            painter.restore()
+            
+            
+            # dashed rectangle
+            if self.drag is True:
+                padding = 30
+                rect = self.viewport().rect().adjusted(padding, padding, -padding, -padding)
+                
+                pen = QtGui.QPen(dashed_line_color, 2, QtCore.Qt.DashLine)
+                pen.setDashPattern([5, 5])
+                painter.setPen(pen)
+                
+                painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
+                
+                cornerRadius = 10
+                painter.drawRoundedRect(rect, cornerRadius, cornerRadius)
+                
+
+
 class MaterialCreator(QtWidgets.QWidget):
     def __init__(self):
         super(MaterialCreator,self).__init__()
         ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
-        self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
+        loader = QtUiTools.QUiLoader()
+        loader.registerCustomWidget(DragDropList)
+        self.ui = loader.load(ui_file, parentWidget=self)
         
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -66,16 +223,14 @@ class MaterialCreator(QtWidgets.QWidget):
         settings_path = hou.expandString("$AMMATBUILD/settings.ini")
         self.settings = QtCore.QSettings(settings_path, QtCore.QSettings.IniFormat)
         
-        self.ui.btn_addfiles.clicked.connect(self.add_files)
+        self.ui.btn_addfiles.clicked.connect(self.ui.list_textures.add_files)
         self.ui.btn_gensetup.clicked.connect(self.generate_setup)
         
         self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
         self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
         
         self.ui.list_textures.setAcceptDrops(True)
-        self.ui.list_textures.installEventFilter(self)
-        
-        self.paths_list = [] 
+
         
         self.center_window()
         self.generate_engine_UI()
@@ -93,8 +248,8 @@ class MaterialCreator(QtWidgets.QWidget):
                     
     def retrieve_settings(self):
         if self.settings.contains("cb_wipe_network"):
-            self.ui.cb_wipe_network.setChecked(self.settings.value("cb_wipe_network"))
-    
+            self.ui.cb_wipe_network.setChecked(bool(self.settings.value("cb_wipe_network")))
+            
         # Note: using .itemAt(i) on .ui file widgets results in a bug
         layouts = [self.ui.engines_layout, self.ui.engine_options_layout]
         for layout in layouts:
@@ -104,7 +259,7 @@ class MaterialCreator(QtWidgets.QWidget):
                     widget_name = layout.itemAt(i).widget().objectName()
                     if isinstance(widget, QtWidgets.QCheckBox):
                         if self.settings.contains(layout.itemAt(i).widget().objectName()):
-                            layout.itemAt(i).widget().setChecked(self.settings.value(layout.itemAt(i).widget().objectName()))
+                            layout.itemAt(i).widget().setChecked(bool(self.settings.value(layout.itemAt(i).widget().objectName())))
                         
 
     def closeEvent(self, event):
@@ -126,7 +281,11 @@ class MaterialCreator(QtWidgets.QWidget):
             self.ui.engines_layout.addWidget(checkbox_instance)
             
             # create options checkboxes
-            if "options_checkboxes" in lookup[engine]:
+            if "options_checkboxes" in lookup[engine] and len(lookup[engine]["options_checkboxes"])>0:
+                label = QtWidgets.QLabel()
+                label.setText(f"{engine} options:")
+                self.ui.engine_options_layout.addWidget(label)
+                
                 for option in lookup[engine]["options_checkboxes"]:
                     checkbox_name = option["ui_name"]
                     checkbox_instance = QtWidgets.QCheckBox()
@@ -140,84 +299,6 @@ class MaterialCreator(QtWidgets.QWidget):
     def center_window(self):
         center = hou.ui.mainQtWindow().geometry().center()
         self.move(center - self.geometry().center())
-    
-    def add_files(self):
-        """
-        Adds image files using a button.
-        """
-        files = hou.ui.selectFile(multiple_select=True, file_type=hou.fileType.Image)
-        files = files.split(" ; ")
-        self.create_items_from_list(files)
-                
-    def create_items_from_list(self, files):
-        for filepath in files:
-            if filepath != "" and filepath not in self.paths_list:
-                self.add_item(filepath)
-                
-    def eventFilter(self, source, event):
-        """
-        Accepts dropping image files into the list.
-        """
-        if event.type() == QtCore.QEvent.Drop:
-            if event.mimeData().hasUrls():
-                if event.mimeData().hasUrls():
-                    event.setDropAction(QtCore.Qt.CopyAction)
-                    event.accept()
-                    
-                    files = []
-                    
-                    for url in event.mimeData().urls():
-                        if url.isLocalFile():
-                            files.append(str(url.toLocalFile()))
-                        else:
-                            files.append(str(url.toString()))
-                            
-                    self.create_items_from_list(files)
-                else:
-                    event.ignore()
-            
-        if event.type() == QtCore.QEvent.DragEnter:
-            return True
-        # elif event.type() == QtCore.QEvent.DragMove:
-        #     print("Drag Move Event")
-            # Handle drag move event here
-            # return True
-        return super(MaterialCreator, self).eventFilter(source, event)
-        
-    def update_maps(self, clicked_widget, newly_set_value):
-        """
-        Ensures that all textures on the list are set to a unique value.
-        It's called any time a combo box value is changed.
-        """
-        for index in range(self.ui.list_textures.count()):
-            item = self.ui.list_textures.item(index)
-            item_widget = self.ui.list_textures.itemWidget(item)
-            combo_box = item_widget.ui.texture_type 
-            
-            if item_widget != clicked_widget:
-                if combo_box.currentIndex() == newly_set_value:
-                    combo_box.setCurrentIndex(-1)
-                else:
-                    pass
-            else:
-                pass
-        
-    def add_item(self, filepath):
-        """
-        Adds a new item to the QListWidget,
-        And creates and attaches a new List_Item_Widget to it. 
-        """
-        self.paths_list.append(filepath)
-        
-        list_item = QtWidgets.QListWidgetItem()
-        list_item.setSizeHint(QtCore.QSize(90,75))
-        self.ui.list_textures.addItem(list_item)
-        
-        widget = List_Item_Widget(filepath)
-        self.ui.list_textures.setItemWidget(list_item, widget)
-
-        widget.ui.texture_type.currentIndexChanged.connect(lambda new_value=widget.ui.texture_type.currentText(): self.update_maps(widget, new_value))
-  
     
     def info_clean(self):
         self.ui.label_info.setText("")
@@ -242,13 +323,21 @@ class MaterialCreator(QtWidgets.QWidget):
         
         collect = stage.createNode("collect")
         
-        
+        index = 0
         for engine in lookup.keys():
             engine_checkbox = getattr(self.ui, lookup[engine]["engine_enable_checkbox"], None) 
             
-            if engine_checkbox.isChecked() == True:            
+            if engine_checkbox.isChecked() == True:
                 subnet = stage.createNode("subnet")
-                self.process_node_recursive(subnet, lookup[engine]["nodes"]["children"][0], subnet.node("suboutput1"))
+                
+                if subnet.node("suboutput1") is not None:
+                    subnet.node("suboutput1").destroy()
+
+                for node in lookup[engine].get("nodes",[]):
+                    self.process_node_recursive(subnet, node)
+                
+                collect.setInput(index, subnet)
+                index += 1
                 subnet.layoutChildren()
 
         stage.layoutChildren()
@@ -439,8 +528,8 @@ class List_Item_Widget(QtWidgets.QWidget):
             if list.itemWidget(item) == self:
                 list.takeItem(list.row(item))
                 break
-        
-        list.parent().parent().paths_list.remove(self.path)
+
+        list.paths_list.remove(self.path)
 
         
 
@@ -448,87 +537,6 @@ class List_Item_Widget(QtWidgets.QWidget):
     
 win = MaterialCreator()
 win.show()
-
-
-
-
-
-            
-            
-        
-        # for engine in lookup.keys():
-        #     engine_checkbox = getattr(self.ui, lookup[engine]["checkbox"], None) 
-            
-        #     if engine_checkbox.isChecked() == True:
-        #         main_node = stage.createNode(lookup[engine]["main_node"])
-        #         main_node.setGenericFlag(hou.nodeFlag.Material, False)
-                
-        #         last_node = main_node
-           
-        #         for intermediary_node in lookup[engine]["material_intermediary_nodes"]:
-        #             if intermediary_node == 'redshift::Sprite':
-        #                 if self.ui.cb_enablerssprite.isChecked() == False:
-        #                     continue
-        #                 elif self.is_there_opacity_map() == False:
-        #                     continue
-        #             inter_node = stage.createNode(intermediary_node)
-        #             inter_node.setGenericFlag(hou.nodeFlag.Material, False)
-        #             self.redshift_output = inter_node
-        #             inter_node.setInput(0, last_node)
-        #             last_node = inter_node
-                    
-        #         collect.setInput(self.input_index, last_node)
-        #         self.input_index += 1
-                
-                    
-        #         for index in range(self.ui.list_textures.count()):
-        #             widget = self.get_item_widget(index)
-                    
-        #             type = type_lookup[widget.ui.texture_type.currentIndex()]
-                    
-        #             file_path = widget.path
-                    
-        #             self.create_image_node(stage, engine, collect, main_node, type, file_path)
-              
-        # stage.layoutChildren()
-        # self.input_index = 0
-        
-        
-        
-        
-        
-        
-        
-            # def create_image_node(self, stage, engine, collect, main_node, type, file_path):
-    #     img_node = stage.createNode(lookup[engine]["image_node"])
-        
-    #     img_parm = lookup[engine]["image_parms"]
-        
-    #     img_node.parm(img_parm["type"]).set(img_parm["mode"][type])
-    #     img_node.parm(img_parm["filepath"]).set(file_path)
-        
-        
-    #     if type in lookup[engine]["image_intermediary_nodes"]:
-    #         intermediary_dict = lookup[engine]["image_intermediary_nodes"][type]
-    #         node_to_create = intermediary_dict["node"]
-    #         input_index = intermediary_dict["input"]
-    #         parms_to_change = intermediary_dict["parms_to_change"]
-    #         connect_target = intermediary_dict["target"]
-            
-    #         intermediary = stage.createNode(node_to_create)
-    #         intermediary.setGenericFlag(hou.nodeFlag.Material, False)
-    #         intermediary.setInput(input_index, img_node)
-    #         intermediary.setParms(parms_to_change)
-            
-    #         if connect_target == "main_node":
-    #             main_node.setInput(lookup[engine]["main_inputs"][type], intermediary)
-    #         elif connect_target == "intermediary_output":
-    #             self.redshift_output.setInput(1, intermediary)
-    #         elif connect_target == "collect":
-    #             collect.setInput(self.input_index, intermediary)
-    #             self.input_index += 1
-                
-    #     else:
-    #         main_node.setInput(lookup[engine]["main_inputs"][type], img_node)]]></script>
+]]></script>
   </tool>
 </shelfDocument>
