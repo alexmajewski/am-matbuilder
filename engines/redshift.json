@@ -29,6 +29,7 @@
                                 "children": [
                                     {
                                         "type": "redshift::StandardMaterial",
+                                        "expand_input_groups": ["Base Properties"],
                                         "connect_to": 0,
                                         "children": [
                                             {

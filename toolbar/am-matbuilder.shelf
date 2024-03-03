@@ -23,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -63,7 +63,7 @@ class DragDropList(QtWidgets.QListWidget):
        
         
         self.instructions = {
-            "idle": "Add or drag and drop image texture files here",
+            "idle": "Add or drag and drop images here",
             "drag": "Drop images here"
             }
             
@@ -132,9 +132,12 @@ class DragDropList(QtWidgets.QListWidget):
         event.acceptProposedAction()
             
     def dragLeaveEvent(self, event):
+        self.reset_display_text()
+    
+    def reset_display_text(self):
         self.update_text(self.instructions['idle'])
         self.drag = False
-    
+        
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
             if event.mimeData().hasUrls():
@@ -150,7 +153,7 @@ class DragDropList(QtWidgets.QListWidget):
                         files.append(str(url.toString()))
                         
                 self.create_items_from_list(files)
-                self.drag = False
+                self.reset_display_text()
             else:
                 event.ignore()
             
@@ -207,6 +210,8 @@ class MaterialCreator(QtWidgets.QWidget):
         loader.registerCustomWidget(DragDropList)
         self.ui = loader.load(ui_file, parentWidget=self)
         
+        self.ui.button_settings.setIcon(hou.qt.Icon("BUTTONS_gear"))
+        
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
@@ -226,6 +231,8 @@ class MaterialCreator(QtWidgets.QWidget):
         self.ui.btn_addfiles.clicked.connect(self.ui.list_textures.add_files)
         self.ui.btn_gensetup.clicked.connect(self.generate_setup)
         
+        self.ui.button_settings.clicked.connect(self.open_settings_dialog)
+        
         self.ui.list_textures.setSelectionMode(QtWidgets.QListWidget.NoSelection)
         self.ui.list_textures.setStyleSheet("QListWidget::item:hover { background-color: none; }")
         
@@ -237,8 +244,12 @@ class MaterialCreator(QtWidgets.QWidget):
         self.retrieve_settings()
         
     def save_settings(self):
-        self.settings.setValue(f"cb_wipe_network", self.ui.cb_wipe_network.isChecked())
-    
+        # material name
+        self.settings.setValue("input_mat_name", self.ui.input_mat_name.text())
+        
+        # checkboxes
+        self.settings.setValue("cb_wipe_network", self.ui.cb_wipe_network.isChecked())
+        
         layouts = [self.ui.engines_layout, self.ui.engine_options_layout]
         for layout in layouts:
             for i in range(layout.count()):
@@ -246,7 +257,14 @@ class MaterialCreator(QtWidgets.QWidget):
                 if isinstance(widget, QtWidgets.QCheckBox):
                     self.settings.setValue(f"{widget.objectName()}", widget.isChecked())
                     
+        
+                    
     def retrieve_settings(self):
+        # material name
+        if self.settings.contains("input_mat_name"):
+            self.ui.input_mat_name.setText(self.settings.value("input_mat_name"))
+    
+        # checkboxes
         if self.settings.contains("cb_wipe_network"):
             self.ui.cb_wipe_network.setChecked(bool(self.settings.value("cb_wipe_network")))
             
@@ -387,6 +405,8 @@ class MaterialCreator(QtWidgets.QWidget):
                     # connect to parent
                     if parent != None and "connect_to" in json_object:
                         parent.setInput(json_object["connect_to"], node)
+                        
+                    self.check_expand_input_groups(node, json_object)
                     
                     # set parameters
                     if 'parms' in json_object:
@@ -410,6 +430,8 @@ class MaterialCreator(QtWidgets.QWidget):
             else:
                 node = subnet.createNode(json_object['type'])
                 
+                self.check_expand_input_groups(node, json_object)
+                
                 if 'parms' in json_object:
                     node.setParms(json_object['parms'])
                 
@@ -424,7 +446,14 @@ class MaterialCreator(QtWidgets.QWidget):
             for child_node in json_object.get("children", []):
                 self.process_node_recursive(subnet, child_node, parent)
             
-
+    def check_expand_input_groups(self, node, object):
+        """
+        Expands input groups 
+        """
+        if 'expand_input_groups' in object:
+            for input_group in object['expand_input_groups']:
+                node.setInputGroupExpanded(input_group, True)
+                
     def get_item_widget(self, index):
         item = self.ui.list_textures.item(index)
         widget = self.ui.list_textures.itemWidget(item)
@@ -450,13 +479,24 @@ class MaterialCreator(QtWidgets.QWidget):
             if widget.ui.texture_type.currentIndex() == opacity_index:
                 return True
         return False
-         
-
     
     def wipe_network(self, network):
         for child_node in network.children():
             child_node.destroy()
-
+            
+    def open_settings_dialog(self):
+        settings_dialog = ModalSettingsDialog()
+        settings_dialog.setWindowTitle('Settings')
+        settings_dialog.setModal(True)
+        settings_dialog.exec_()
+            
+class ModalSettingsDialog(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+        ui_file = hou.expandString('$AMMATBUILD/settings_modal.ui')
+        loader = QtUiTools.QUiLoader()
+        self.ui = loader.load(ui_file, parentWidget=self)
+        
 
 class List_Item_Widget(QtWidgets.QWidget):
     def __init__(self, filepath, parent=None):
