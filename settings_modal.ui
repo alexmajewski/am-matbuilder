@@ -29,23 +29,62 @@
       <number>20</number>
      </property>
      <item>
-      <widget class="QCheckBox" name="checkBox">
+      <widget class="QLabel" name="label">
        <property name="text">
-        <string>Lay out network</string>
+        <string>Solaris</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButton">
+      <widget class="QCheckBox" name="checkBox_2">
+       <property name="toolTip">
+        <string>Creates a Collect lop</string>
+       </property>
        <property name="text">
-        <string>Selection to JSON Template</string>
+        <string>Collect Nodes into a Single Material</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <widget class="Line" name="line">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_save_to_json">
+       <property name="text">
+        <string>Template from Selected</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item>
       <widget class="QDialogButtonBox" name="buttonBox">
        <property name="standardButtons">
-        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+       </property>
+       <property name="centerButtons">
+        <bool>false</bool>
        </property>
       </widget>
      </item>

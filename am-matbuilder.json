@@ -1,6 +1,6 @@
 {
 	"env": [{
-		"AMMATBUILD": "/home/xander/houdini_packages/am-matbuilder"
+		"AMMATBUILD": "C:/Users/Xander/Documents/houdini_packages/am-matbuilder"
 	}],
 
 	"path": "$AMMATBUILD",

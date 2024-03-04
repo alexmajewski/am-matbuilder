@@ -23,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -487,8 +487,65 @@ class MaterialCreator(QtWidgets.QWidget):
     def open_settings_dialog(self):
         settings_dialog = ModalSettingsDialog()
         settings_dialog.setWindowTitle('Settings')
-        settings_dialog.setModal(True)
         settings_dialog.exec_()
+        
+class TemplateDialog(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+        ui_file = hou.expandString('$AMMATBUILD/template_modal.ui')
+        loader = QtUiTools.QUiLoader()
+        self.ui = loader.load(ui_file, parentWidget=self)
+        self.resize(300,200)
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        layout.addWidget(self.ui)
+        
+        # connections
+        self.ui.btn_save.clicked.connect(self.save)
+        self.ui.btn_close.clicked.connect(lambda: self.close())
+        
+        self.passed_validation = False
+    
+    def info_clean(self):
+        self.ui.label_info.setText("")
+        self.ui.label_info.setStyleSheet("")
+    
+    def info_display_error(self, error_message):
+        self.ui.label_info.setText(error_message)
+        self.ui.label_info.setStyleSheet("color:#fc979a;")
+        
+    def is_name_valid(self):
+        name = self.ui.input_enginename.text()
+        overwrite = self.ui.cb_overwrite.checkState()
+        if not overwrite:  
+            for engine in lookup:
+                if name.lower() == engine.lower():
+                    self.info_display_error("This name is already in use")
+                    return False
+        return True
+        
+    def is_selection_valid(self):
+        nodes = hou.selectedNodes()
+        
+        if len(nodes) < 1:
+            return False
+        
+        for node in nodes:
+            if not isinstance(node, hou.VopNode):
+                self.info_display_error("Only Vop nodes are allowed")
+                
+                return False
+        
+        return True
+                
+    def save(self):
+        if self.is_name_valid() and self.is_selection_valid():
+            print("Valid")
+        else:
+            print("Invalid")
+            
+
             
 class ModalSettingsDialog(QtWidgets.QDialog):
     def __init__(self):
@@ -496,6 +553,38 @@ class ModalSettingsDialog(QtWidgets.QDialog):
         ui_file = hou.expandString('$AMMATBUILD/settings_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
+        self.resize(400, 300)
+        self.ui.btn_save_to_json.setIcon(hou.qt.Icon("LOP_sublayer"))
+        
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        layout.addWidget(self.ui)
+        
+        # connections
+        self.ui.btn_save_to_json.clicked.connect(self.open_template_dialog)
+        
+    def open_template_dialog(self):
+        settings_dialog = TemplateDialog()
+        settings_dialog.setWindowTitle('New Template')
+        settings_dialog.exec_()
+    
+    def save_selection_as_template(self):
+        # TODO:
+        # [x] get selected material output
+        # [ ] traverse its nodes
+        # [ ] generate object
+        # [ ] save non-default params
+        # [ ] save json
+        
+        nodes = hou.selectedNodes()
+        final_nodes = []
+        
+        for node in nodes:
+            outputs = len(node.outputs())
+            if outputs == 0:
+                final_nodes.append(node)
+                
         
 
 class List_Item_Widget(QtWidgets.QWidget):
