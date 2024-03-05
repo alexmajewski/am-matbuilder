@@ -23,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -340,13 +340,15 @@ class MaterialCreator(QtWidgets.QWidget):
             self.wipe_network(stage)
         
         collect = stage.createNode("collect")
-        
+        mat_name = self.ui.input_mat_name.text()
         index = 0
         for engine in lookup.keys():
             engine_checkbox = getattr(self.ui, lookup[engine]["engine_enable_checkbox"], None) 
             
             if engine_checkbox.isChecked() == True:
-                subnet = stage.createNode("subnet")
+                # TODO: validate mat name
+                engine_mat_name = f"{mat_name}_{engine}"
+                subnet = stage.createNode("subnet", node_name=engine_mat_name)
                 
                 if subnet.node("suboutput1") is not None:
                     subnet.node("suboutput1").destroy()
@@ -486,7 +488,7 @@ class MaterialCreator(QtWidgets.QWidget):
             
     def open_settings_dialog(self):
         settings_dialog = ModalSettingsDialog()
-        settings_dialog.setWindowTitle('Settings')
+        settings_dialog.setWindowTitle('Extras')
         settings_dialog.exec_()
         
 class TemplateDialog(QtWidgets.QDialog):
@@ -515,8 +517,16 @@ class TemplateDialog(QtWidgets.QDialog):
         self.ui.label_info.setText(error_message)
         self.ui.label_info.setStyleSheet("color:#fc979a;")
         
+    def info_display_success(self, success_message):
+        self.ui.label_info.setText(success_message)
+        
     def is_name_valid(self):
         name = self.ui.input_enginename.text()
+        
+        if len(name) < 1:
+            self.info_display_error("Name is required")
+            return False
+        
         overwrite = self.ui.cb_overwrite.checkState()
         if not overwrite:  
             for engine in lookup:
@@ -529,6 +539,7 @@ class TemplateDialog(QtWidgets.QDialog):
         nodes = hou.selectedNodes()
         
         if len(nodes) < 1:
+            self.info_display_error("Please select nodes in the Network Editor")
             return False
         
         for node in nodes:
@@ -540,10 +551,74 @@ class TemplateDialog(QtWidgets.QDialog):
         return True
                 
     def save(self):
+        self.info_clean()
         if self.is_name_valid() and self.is_selection_valid():
-            print("Valid")
+            
+            self.engine_name = self.ui.input_enginename.text()
+            self.info_display_success(f"Saved as {self.engine_name.lower()}.json")
+            
+            
+            self.json_object = {
+                f"{self.engine_name}": {
+                    "engine_enable_checkbox": f"cb_use_{self.engine_name.lower()}",
+                    "nodes": []
+                }
+
+            }
+            
+            self.traverse_nodes()
+            
+            json_file_path = hou.expandString(f'$AMMATBUILD/engines/{self.engine_name.lower()}.json')
+            with open(json_file_path, 'w') as json_file:
+                json.dump(self.json_object, json_file, indent=4)
         else:
-            print("Invalid")
+            pass
+            
+            
+        # TODO:
+        # [x] get selected material output
+        # [x] traverse its nodes
+        # [x] generate object
+        # [ ] save non-default params
+        # [x] save json
+        
+    def traverse_nodes(self):
+        """
+        Traverses currently selected nodes 
+        and constructs a dictionary to be saved as a JSON file.
+        """
+        selected_nodes = hou.selectedNodes()
+        final_nodes = []
+        
+        for node in selected_nodes:
+            if len(node.outputs()) < 1:
+                final_nodes.append(node)
+        
+        for final_node in final_nodes:
+            self.add_node_recursive(final_node, self.json_object[self.engine_name]['nodes'], connect_index=None)
+            
+        
+    def add_node_recursive(self, node, parent_key, connect_index=None):
+        
+        node_object = {
+            "type": node.type().name()
+        }
+        if connect_index is not None:
+            node_object["connect_to"] = connect_index
+        
+        parent_key.append(node_object)
+        
+        inputs = node.inputs()
+        if len(inputs) > 0:
+            node_object["children"] = []
+            
+            connections = node.inputConnections()
+            
+            for connection in connections:
+                index = connection.inputIndex()
+                child_node = node.input(index)
+                
+                self.add_node_recursive(child_node, parent_key[-1]["children"], index)
             
 
             
@@ -553,7 +628,7 @@ class ModalSettingsDialog(QtWidgets.QDialog):
         ui_file = hou.expandString('$AMMATBUILD/settings_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
-        self.resize(400, 300)
+        self.resize(350, 300)
         self.ui.btn_save_to_json.setIcon(hou.qt.Icon("LOP_sublayer"))
         
         layout = QtWidgets.QVBoxLayout()
@@ -568,23 +643,6 @@ class ModalSettingsDialog(QtWidgets.QDialog):
         settings_dialog = TemplateDialog()
         settings_dialog.setWindowTitle('New Template')
         settings_dialog.exec_()
-    
-    def save_selection_as_template(self):
-        # TODO:
-        # [x] get selected material output
-        # [ ] traverse its nodes
-        # [ ] generate object
-        # [ ] save non-default params
-        # [ ] save json
-        
-        nodes = hou.selectedNodes()
-        final_nodes = []
-        
-        for node in nodes:
-            outputs = len(node.outputs())
-            if outputs == 0:
-                final_nodes.append(node)
-                
         
 
 class List_Item_Widget(QtWidgets.QWidget):
