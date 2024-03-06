@@ -23,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -39,7 +39,7 @@ for filename in os.listdir(json_dir):
             
 
 type_lookup = {
-    0: "base_color",
+    0: "basecolor",
     1: "metallness",
     2: "roughness",
     3: "normal",
@@ -250,6 +250,7 @@ class MaterialCreator(QtWidgets.QWidget):
         self.settings.setValue("input_mat_name", self.ui.input_mat_name.text())
         
         # checkboxes
+        self.settings.setValue("cb_collect_nodes", self.ui.cb_collect_nodes.isChecked())
         self.settings.setValue("cb_wipe_network", self.ui.cb_wipe_network.isChecked())
         
         layouts = [self.ui.engines_layout, self.ui.engine_options_layout]
@@ -267,6 +268,8 @@ class MaterialCreator(QtWidgets.QWidget):
             self.ui.input_mat_name.setText(self.settings.value("input_mat_name"))
     
         # checkboxes
+        if self.settings.contains("cb_collect_nodes"):
+            self.ui.cb_collect_nodes.setChecked(bool(self.settings.value("cb_collect_nodes")))
         if self.settings.contains("cb_wipe_network"):
             self.ui.cb_wipe_network.setChecked(bool(self.settings.value("cb_wipe_network")))
             
@@ -341,7 +344,9 @@ class MaterialCreator(QtWidgets.QWidget):
         if self.ui.cb_wipe_network.isChecked() == True:
             self.wipe_network(stage)
         
-        collect = stage.createNode("collect")
+        if self.ui.cb_collect_nodes.isChecked() == True:
+            collect = stage.createNode("collect")
+            
         mat_name = self.ui.input_mat_name.text()
         index = 0
         for engine in lookup.keys():
@@ -358,8 +363,12 @@ class MaterialCreator(QtWidgets.QWidget):
                 for node in lookup[engine].get("nodes",[]):
                     self.process_node_recursive(subnet, node)
                 
-                collect.setInput(index, subnet)
-                index += 1
+                if self.ui.cb_collect_nodes.isChecked() == True:
+                    collect.setInput(index, subnet)
+                    index += 1
+                else:
+                    subnet.setMaterialFlag(True)
+
                 subnet.layoutChildren()
 
         stage.layoutChildren()
@@ -499,7 +508,7 @@ class TemplateDialog(QtWidgets.QDialog):
         ui_file = hou.expandString('$AMMATBUILD/template_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
-        self.resize(300,300)
+        self.resize(400,300)
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
@@ -602,8 +611,12 @@ class TemplateDialog(QtWidgets.QDialog):
         node_object = {
             "type": node.type().name()
         }
-        if connect_index is not None:
-            node_object["connect_to"] = connect_index
+        
+        node_name = node.name().split("_")
+        if len(node_name) > 1:
+            if node_name[-2] == "map":
+                node_object["map"] = node_name[-1]
+        
         
         parms_dict = {}
         for parm in node.parmTuples():
@@ -629,8 +642,17 @@ class TemplateDialog(QtWidgets.QDialog):
             if parm_tuple != default_value:
                 parms_dict[parm.name()] = parm_value[0]
                 
+            # check for file path parameters
+            file_path_params = self.ui.input_path_params.text().split(" ")
+            
+            if parm.name() in file_path_params:
+                parms_dict[parm.name()] = "{{path}}"
+                
         if len(parms_dict) > 0:
             node_object["parms"] = parms_dict
+            
+        if connect_index is not None:
+            node_object["connect_to"] = connect_index
             
         parent_key.append(node_object)
         
@@ -679,7 +701,7 @@ class ExtrasDialog(QtWidgets.QDialog):
         directory = hou.expandString('$AMMATBUILD/engines/')
         
         if sys.platform.startswith('win'):
-            os.system(r'start "{}"'.format(directory))
+            os.startfile(directory)
         elif sys.platform.startswith('linux'):
             os.system(r'xdg-open "{}"'.format(directory))
         elif sys.platform.startswith('darwin'):

@@ -34,7 +34,7 @@
                                         "children": [
                                             {
                                                 "type": "redshift::TextureSampler",
-                                                "map": "base_color",
+                                                "map": "basecolor",
                                                 "parms": {
                                                     "tex0_colorSpace": "sRGB",
                                                     "tex0": "{{path}}"
