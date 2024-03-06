@@ -23,7 +23,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.3.3"
+__version__ = "0.4.0"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -230,6 +230,8 @@ class MaterialCreator(QtWidgets.QWidget):
         
         self.ui.btn_addfiles.clicked.connect(self.ui.list_textures.add_files)
         self.ui.btn_gensetup.clicked.connect(self.generate_setup)
+        
+        self.ui.btn_close.clicked.connect(lambda: self.close())
         
         self.ui.button_settings.clicked.connect(self.open_settings_dialog)
         
@@ -487,17 +489,17 @@ class MaterialCreator(QtWidgets.QWidget):
             child_node.destroy()
             
     def open_settings_dialog(self):
-        settings_dialog = ModalSettingsDialog()
-        settings_dialog.setWindowTitle('Extras')
-        settings_dialog.exec_()
+        extras_dialog = ExtrasDialog(parent=self)
+        extras_dialog.setWindowTitle('Extras')
+        extras_dialog.show()
         
 class TemplateDialog(QtWidgets.QDialog):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         ui_file = hou.expandString('$AMMATBUILD/template_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
-        self.resize(300,200)
+        self.resize(300,300)
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
@@ -555,7 +557,7 @@ class TemplateDialog(QtWidgets.QDialog):
         if self.is_name_valid() and self.is_selection_valid():
             
             self.engine_name = self.ui.input_enginename.text()
-            self.info_display_success(f"Saved as {self.engine_name.lower()}.json")
+            self.info_display_success(f"Saved as {self.engine_name.lower()}.json\nPlease restart the tool")
             
             
             self.json_object = {
@@ -574,13 +576,6 @@ class TemplateDialog(QtWidgets.QDialog):
         else:
             pass
             
-            
-        # TODO:
-        # [x] get selected material output
-        # [x] traverse its nodes
-        # [x] generate object
-        # [ ] save non-default params
-        # [x] save json
         
     def traverse_nodes(self):
         """
@@ -599,6 +594,10 @@ class TemplateDialog(QtWidgets.QDialog):
             
         
     def add_node_recursive(self, node, parent_key, connect_index=None):
+        """
+        Adds a node to a JSON dict.
+        It checks for parameters containing non-default values and stores them.
+        """
         
         node_object = {
             "type": node.type().name()
@@ -606,6 +605,33 @@ class TemplateDialog(QtWidgets.QDialog):
         if connect_index is not None:
             node_object["connect_to"] = connect_index
         
+        parms_dict = {}
+        for parm in node.parmTuples():
+            
+            if parm.parmTemplate().isHidden():
+                continue
+            
+            try:
+                default_value = parm.parmTemplate().defaultValue()
+            except:
+                continue
+            
+            if not isinstance(default_value, tuple):
+                default_value = (default_value,)
+
+            parm_value = parm.eval()
+            
+            if not isinstance(parm_value, tuple):
+                parm_tuple = (parm_value,)
+            else:
+                parm_tuple = parm_value
+                
+            if parm_tuple != default_value:
+                parms_dict[parm.name()] = parm_value[0]
+                
+        if len(parms_dict) > 0:
+            node_object["parms"] = parms_dict
+            
         parent_key.append(node_object)
         
         inputs = node.inputs()
@@ -622,14 +648,17 @@ class TemplateDialog(QtWidgets.QDialog):
             
 
             
-class ModalSettingsDialog(QtWidgets.QDialog):
-    def __init__(self):
-        super().__init__()
+class ExtrasDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         ui_file = hou.expandString('$AMMATBUILD/settings_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
-        self.resize(350, 300)
+        self.resize(350, 200)
         self.ui.btn_save_to_json.setIcon(hou.qt.Icon("LOP_sublayer"))
+        
+        # self.setParent(hou.qt.mainWindow(), QtCore.Qt.Window)
+        self.setWindowFlags(QtCore.Qt.Tool)
         
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -638,11 +667,27 @@ class ModalSettingsDialog(QtWidgets.QDialog):
         
         # connections
         self.ui.btn_save_to_json.clicked.connect(self.open_template_dialog)
+        self.ui.btn_close.clicked.connect(lambda: self.close())
+        self.ui.btn_open_template_dir.clicked.connect(self.open_template_directory)
         
     def open_template_dialog(self):
-        settings_dialog = TemplateDialog()
-        settings_dialog.setWindowTitle('New Template')
-        settings_dialog.exec_()
+        template_dialog = TemplateDialog(parent=self)
+        template_dialog.setWindowTitle('New Template')
+        template_dialog.show()
+        
+    def open_template_directory(self):
+        directory = hou.expandString('$AMMATBUILD/engines/')
+        
+        if sys.platform.startswith('win'):
+            os.system(r'start "{}"'.format(directory))
+        elif sys.platform.startswith('linux'):
+            os.system(r'xdg-open "{}"'.format(directory))
+        elif sys.platform.startswith('darwin'):
+            os.system(r'open "{}"'.format(directory))
+        else:
+            print("Unsupported operating system (something went wrong)")
+        
+        
         
 
 class List_Item_Widget(QtWidgets.QWidget):

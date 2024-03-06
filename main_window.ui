@@ -286,6 +286,18 @@
        </property>
       </widget>
      </item>
+     <item>
+      <widget class="QPushButton" name="btn_close">
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Close</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
   </layout>
