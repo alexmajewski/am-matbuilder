@@ -1,15 +1,14 @@
 {
     "MaterialX": {
-        "engine_enable_checkbox": "cb_use_mtlx",
+        "engine_enable_checkbox": "cb_use_materialx",
         "nodes": [
             {
                 "type": "subnetconnector",
-                "output": true,
                 "parms": {
-                    "connectorkind": "output",
+                    "connectorkind": 1,
                     "parmname": "surface",
                     "parmlabel": "Surface",
-                    "parmtype": "surface"
+                    "parmtype": 24
                 },
                 "children": [
                     {
@@ -27,9 +26,8 @@
                             },
                             {
                                 "type": "mtlximage",
-                                "map": "metallness",
+                                "map": "metalness",
                                 "parms": {
-                                    "signature": "default",
                                     "file": "{{path}}"
                                 },
                                 "connect_to": 3
@@ -38,41 +36,63 @@
                                 "type": "mtlximage",
                                 "map": "roughness",
                                 "parms": {
-                                    "signature": "default",
                                     "file": "{{path}}"
                                 },
                                 "connect_to": 6
                             },
                             {
                                 "type": "mtlximage",
-                                "map": "transmission",
-                                "parms": {
-                                    "signature": "default",
-                                    "file": "{{path}}"
-                                },
-                                "connect_to": 10
-                            },
-                            {
-                                "type": "mtlximage",
-                                "map": "emission",
-                                "parms": {
-                                    "signature": "default",
-                                    "file": "{{path}}"
-                                },
-                                "connect_to": 36
-                            },
-                            {
-                                "type": "mtlximage",
                                 "map": "opacity",
                                 "parms": {
-                                    "signature": "default",
                                     "file": "{{path}}"
                                 },
                                 "connect_to": 38
+                            },
+                            {
+                                "type": "mtlxnormalmap",
+                                "map": "normal",
+                                "connect_to": 40,
+                                "children": [
+                                    {
+                                        "type": "mtlximage",
+                                        "map": "normal",
+                                        "parms": {
+                                            "signature": "vector3",
+                                            "file": "{{path}}"
+                                        },
+                                        "connect_to": 0
+                                    }
+                                ]
                             }
                         ]
                     }
-
+                ]
+            },
+            {
+                "type": "subnetconnector",
+                "map": "displacement",
+                "parms": {
+                    "connectorkind": 1,
+                    "parmname": "displacement",
+                    "parmlabel": "Displacement",
+                    "parmtype": 25
+                },
+                "children": [
+                    {
+                        "type": "mtlxdisplacement",
+                        "map": "displacement",
+                        "connect_to": 0,
+                        "children": [
+                            {
+                                "type": "mtlximage",
+                                "map": "displacement",
+                                "parms": {
+                                    "file": "{{path}}"
+                                },
+                                "connect_to": 0
+                            }
+                        ]
+                    }
                 ]
             }
         ]

@@ -43,7 +43,7 @@
                                             },
                                             {
                                                 "type": "redshift::TextureSampler",
-                                                "map": "metallness",
+                                                "map": "metalness",
                                                 "parms": {
                                                     "tex0_colorSpace": "Raw",
                                                     "tex0": "{{path}}"

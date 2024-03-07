@@ -1,0 +1,36 @@
+{
+    "map_types" : [
+        {
+            "type": "normal",
+            "keywords": ["nor"]
+        },
+        {
+            "type": "metalness",
+            "keywords": ["metal"]
+        },
+        {
+            "type": "roughness",
+            "keywords": ["rough"]
+        },
+        {
+            "type": "bump",
+            "keywords": ["bump"]
+        },
+        {
+            "type": "emission",
+            "keywords": ["emission"]
+        },
+        {
+            "type": "basecolor",
+            "keywords": ["color", "diff", "albedo"]
+        },
+        {
+            "type": "opacity",
+            "keywords": ["opacity", "alpha", "transparency"]
+        },
+        {
+            "type": "displacement",
+            "keywords": ["displace", "height"]
+        }
+    ]
+}

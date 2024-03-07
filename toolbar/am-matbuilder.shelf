@@ -7,13 +7,6 @@
 
   <toolshelf name="am_matbuilder" label="AM Mat Builder">
     <memberTool name="am_matbuilder"/>
-    <memberTool name="tool_1"/>
-    <memberTool name="tool_2"/>
-    <memberTool name="tool_3"/>
-    <memberTool name="tool_4"/>
-    <memberTool name="tool_5"/>
-    <memberTool name="tool_6"/>
-    <memberTool name="tool_8"/>
   </toolshelf>
 
   <tool name="am_matbuilder" label="Matbuilder" icon="LOP_materiallibrary">
@@ -23,7 +16,7 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import json
 import sys
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 __author__ = "Alex Majewski"
 
 lookup = {}
@@ -38,16 +31,11 @@ for filename in os.listdir(json_dir):
             lookup[first_key] = json_data[first_key]
             
 
-type_lookup = {
-    0: "basecolor",
-    1: "metallness",
-    2: "roughness",
-    3: "normal",
-    4: "displacement",
-    5: "bump",
-    6: "opacity",
-    7: "emission"
-}
+type_json_file = hou.expandString("$AMMATBUILD/map_types/map_types.json")
+with open(type_json_file, "r") as file:
+    json_data = json.load(file)
+    type_lookup = json_data['map_types']
+            
 # Dropdown menu indices:
 opacity_index = 6
 
@@ -205,7 +193,7 @@ class DragDropList(QtWidgets.QListWidget):
 class MaterialCreator(QtWidgets.QWidget):
     def __init__(self):
         super(MaterialCreator,self).__init__()
-        ui_file = hou.expandString('$AMMATBUILD/main_window.ui')
+        ui_file = hou.expandString('$AMMATBUILD/ui/main_window.ui')
         loader = QtUiTools.QUiLoader()
         loader.registerCustomWidget(DragDropList)
         self.ui = loader.load(ui_file, parentWidget=self)
@@ -225,7 +213,7 @@ class MaterialCreator(QtWidgets.QWidget):
         self.setWindowTitle("Solaris Multi-Engine Material Builder")
         self.ui.label_author.setText(f"Created by Alex Majewski v {__version__}")
         
-        settings_path = hou.expandString("$AMMATBUILD/settings.ini")
+        settings_path = hou.expandString("$AMMATBUILD/local_settings.ini")
         self.settings = QtCore.QSettings(settings_path, QtCore.QSettings.IniFormat)
         
         self.ui.btn_addfiles.clicked.connect(self.ui.list_textures.add_files)
@@ -344,10 +332,11 @@ class MaterialCreator(QtWidgets.QWidget):
         if self.ui.cb_wipe_network.isChecked() == True:
             self.wipe_network(stage)
         
-        if self.ui.cb_collect_nodes.isChecked() == True:
-            collect = stage.createNode("collect")
-            
         mat_name = self.ui.input_mat_name.text()
+            
+        if self.ui.cb_collect_nodes.isChecked() == True:
+            collect = stage.createNode("collect", node_name=mat_name)
+        
         index = 0
         for engine in lookup.keys():
             engine_checkbox = getattr(self.ui, lookup[engine]["engine_enable_checkbox"], None) 
@@ -364,8 +353,9 @@ class MaterialCreator(QtWidgets.QWidget):
                     self.process_node_recursive(subnet, node)
                 
                 if self.ui.cb_collect_nodes.isChecked() == True:
-                    collect.setInput(index, subnet)
-                    index += 1
+                    for i, output in enumerate(subnet.outputNames()):
+                        collect.setInput(index, subnet, output_index=i)
+                        index += 1
                 else:
                     subnet.setMaterialFlag(True)
 
@@ -377,9 +367,13 @@ class MaterialCreator(QtWidgets.QWidget):
         
         desired_type_num = -1
     
-        for key, value in type_lookup.items():
-            if value == desired_type:
-                desired_type_num = key
+        # for key, value in type_lookup.items():
+        #     if value == desired_type:
+        #         desired_type_num = key
+        
+        for i, type in enumerate(type_lookup):
+            if type_lookup[i]["type"] == desired_type:
+                desired_type_num = i
         
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
@@ -415,6 +409,13 @@ class MaterialCreator(QtWidgets.QWidget):
                 if path != None:
                     node = subnet.createNode(json_object['type'])
                     
+                    # ensure default parms
+                    for parmTuple in node.parmTuples():
+                        if parmTuple.parmTemplate().isHidden():
+                            continue
+                        else:
+                            parmTuple.revertToDefaults()
+                    
                     # connect to parent
                     if parent != None and "connect_to" in json_object:
                         parent.setInput(json_object["connect_to"], node)
@@ -424,7 +425,7 @@ class MaterialCreator(QtWidgets.QWidget):
                     # set parameters
                     if 'parms' in json_object:
                         for key, value in json_object['parms'].items():
-                            if "{{path}}" in value:
+                            if isinstance(value, str) and "{{path}}" in value:
                                 json_object['parms'][key] = path
                                 
                         node.setParms(json_object['parms'])
@@ -485,6 +486,7 @@ class MaterialCreator(QtWidgets.QWidget):
         return True
         
     def is_there_opacity_map(self):
+    # TODO
         for index in range(self.ui.list_textures.count()):
             item = self.ui.list_textures.item(index)
             widget = self.ui.list_textures.itemWidget(item)
@@ -505,7 +507,7 @@ class MaterialCreator(QtWidgets.QWidget):
 class TemplateDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        ui_file = hou.expandString('$AMMATBUILD/template_modal.ui')
+        ui_file = hou.expandString('$AMMATBUILD/ui/template_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
         self.resize(400,300)
@@ -624,22 +626,22 @@ class TemplateDialog(QtWidgets.QDialog):
             if parm.parmTemplate().isHidden():
                 continue
             
-            try:
-                default_value = parm.parmTemplate().defaultValue()
-            except:
-                continue
+            # try:
+            #     default_value = parm.parmTemplate().defaultValue()
+            # except:
+            #     continue
             
-            if not isinstance(default_value, tuple):
-                default_value = (default_value,)
+            # if not isinstance(default_value, tuple):
+            #     default_value = (default_value,)
 
             parm_value = parm.eval()
             
-            if not isinstance(parm_value, tuple):
-                parm_tuple = (parm_value,)
-            else:
-                parm_tuple = parm_value
+            # if not isinstance(parm_value, tuple):
+            #     parm_tuple = (parm_value,)
+            # else:
+            #     parm_tuple = parm_value
                 
-            if parm_tuple != default_value:
+            if parm.isAtDefault() == False:
                 parms_dict[parm.name()] = parm_value[0]
                 
             # check for file path parameters
@@ -673,7 +675,7 @@ class TemplateDialog(QtWidgets.QDialog):
 class ExtrasDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        ui_file = hou.expandString('$AMMATBUILD/settings_modal.ui')
+        ui_file = hou.expandString('$AMMATBUILD/ui/settings_modal.ui')
         loader = QtUiTools.QUiLoader()
         self.ui = loader.load(ui_file, parentWidget=self)
         self.resize(350, 200)
@@ -715,7 +717,7 @@ class ExtrasDialog(QtWidgets.QDialog):
 class List_Item_Widget(QtWidgets.QWidget):
     def __init__(self, filepath, parent=None):
         super().__init__(parent)
-        ui_file = hou.expandString('$AMMATBUILD/list_item.ui')
+        ui_file = hou.expandString('$AMMATBUILD/ui/list_item.ui')
         self.ui = QtUiTools.QUiLoader().load(ui_file, parentWidget=self)
         
         layout = QtWidgets.QVBoxLayout()
@@ -729,6 +731,8 @@ class List_Item_Widget(QtWidgets.QWidget):
         resolved_path = hou.expandString(filepath)
         file_name = os.path.basename(resolved_path)
         
+        for i, map in enumerate(type_lookup):
+            self.ui.texture_type.addItem(map["type"].capitalize())
         
         self.ui.file_path.setText(file_name)
         self.ui.file_path.setToolTip(file_name)
@@ -743,34 +747,11 @@ class List_Item_Widget(QtWidgets.QWidget):
     def detect_texture_type(self, file_name):
         file_name = file_name.lower()
         
-        base_color_names = ["color", "diff", "albedo"]
-        opacity_names = ["opacity", "alpha", "transparency"]
-        height_names = ["displace", "height"]
-  
-        if "nor" in file_name:
-            return 3
-        elif "metal" in file_name:
-            return 1
-        elif "rough" in file_name:
-            return 2
-        elif "bump" in file_name:
-            return 5
-        elif "emission" in file_name:
-            return 7
-        
-        for name in base_color_names:
-            if name.lower() in file_name:
-                return 0
-                
-        for name in opacity_names:
-            if name.lower() in file_name:
-                return 6
-                
-        for name in height_names:
-            if name.lower() in file_name:
-                return 4
-        
-        
+        for i, type in enumerate(type_lookup):
+            if type["keywords"] is not None:
+                for name in type["keywords"]:
+                    if name.lower() in file_name:
+                        return i        
             
         return -1
         

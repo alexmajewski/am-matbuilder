@@ -59,46 +59,6 @@
      <property name="editable">
       <bool>false</bool>
      </property>
-     <item>
-      <property name="text">
-       <string>Base Color</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Metallic</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Roughness</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Normal</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Displacement</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Bump</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Opacity</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Emission</string>
-      </property>
-     </item>
     </widget>
    </item>
    <item>
